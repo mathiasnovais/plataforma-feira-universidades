@@ -1,0 +1,1176 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1621">
+<link rel="icon" type="image/png" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-192.png">
+<meta name="robots" content="noindex, nofollow">
+<title>Ao vivo · Alfa University Fair</title>
+<!-- URL e chave anon do projeto: copie config.exemplo.js para config.js -->
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+
+<style>
+  /* Fundo escuro de propósito: esta tela fica aberta num celular
+     no bolso, consultada de relance no meio do salão, e às vezes
+     projetada. Escuro cansa menos e destaca os números. */
+  :root {
+    --azul:#3b9dfb; --verde:#34d399; --ambar:#fbbf24; --vermelho:#f87171;
+    --fundo:#0f1621; --carta:#18212f; --linha:#25303f;
+    --texto:#eef2f7; --fraco:#8fa0b5;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--fundo); color:var(--texto);
+         font:16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .env { max-width:1100px; margin:0 auto; padding:18px 16px 60px; }
+
+  header { display:flex; align-items:center; justify-content:space-between;
+           gap:14px; padding:6px 0 18px; flex-wrap:wrap; }
+  header .esq { display:flex; align-items:center; gap:13px; }
+  header img { height:30px; width:auto; }
+  .marca { font:600 10px/1.4 inherit; letter-spacing:.18em; text-transform:uppercase;
+           color:var(--fraco); margin:0 0 2px; }
+  h1 { margin:0; font-size:20px; letter-spacing:-.02em; }
+
+  /* O ponto pulsando é o que diz "isto está vivo". Sem ele, uma
+     tela parada por 20s parece travada. */
+  .vivo { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--fraco); }
+  .pulso { width:9px; height:9px; border-radius:50%; background:var(--verde);
+           box-shadow:0 0 0 0 rgba(52,211,153,.6); animation:bate 2s infinite; }
+  @keyframes bate {
+    0%   { box-shadow:0 0 0 0 rgba(52,211,153,.55); }
+    70%  { box-shadow:0 0 0 9px rgba(52,211,153,0); }
+    100% { box-shadow:0 0 0 0 rgba(52,211,153,0); }
+  }
+  .pulso.parado { background:var(--vermelho); animation:none; }
+
+  button { font:inherit; cursor:pointer; border:0; border-radius:10px; }
+  .primario { background:var(--azul); color:#06121f; padding:13px 18px; font-weight:700; }
+  .fantasma { background:transparent; color:var(--texto); border:1px solid var(--linha);
+              padding:10px 14px; font-size:14px; }
+  input { font:inherit; width:100%; padding:13px 14px; border:1px solid var(--linha);
+          border-radius:10px; background:var(--carta); color:var(--texto); }
+  input:focus { outline:none; border-color:var(--azul); }
+
+  .acesso { background:var(--carta); border:1px solid var(--linha); border-radius:14px;
+            padding:22px; max-width:400px; margin:40px auto; }
+  .acesso .linha { display:flex; gap:10px; margin-top:12px; }
+  .oculto { display:none !important; }
+  .msg { font-size:13.5px; color:var(--fraco); margin:12px 0 0; }
+  .msg.erro { color:var(--vermelho); }
+
+  /* ---- cartões ---- */
+  .grade { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px; }
+  .cartao { background:var(--carta); border:1px solid var(--linha); border-radius:16px;
+            padding:18px 20px; }
+  .cartao .rotulo { font-size:11.5px; text-transform:uppercase; letter-spacing:.1em;
+                    color:var(--fraco); font-weight:600; }
+  .cartao .pct { font-size:46px; font-weight:800; line-height:1; letter-spacing:-.035em;
+                 margin:10px 0 2px; font-variant-numeric:tabular-nums; }
+  .cartao .abs { font-size:14px; color:var(--fraco); font-variant-numeric:tabular-nums; }
+  .barra { height:8px; border-radius:999px; background:#0d141e; margin-top:14px; overflow:hidden; }
+  .barra span { display:block; height:100%; border-radius:999px; transition:width .5s ease; }
+
+  .c-alunos .pct, .c-alunos .barra span { color:var(--azul); background:var(--azul); }
+  .c-alunos .pct { background:none; }
+  .c-resp .pct { color:var(--verde); }  .c-resp .barra span { background:var(--verde); }
+  .c-conv .pct { color:var(--ambar); }  .c-conv .barra span { background:var(--ambar); }
+  .c-reps .pct { color:#c084fc; }       .c-reps .barra span { background:#c084fc; }
+
+  /* ---- ritmo ---- */
+  .ritmo { display:flex; align-items:flex-end; gap:5px; height:64px; margin-top:14px; }
+  .ritmo div { flex:1; background:var(--azul); border-radius:3px 3px 0 0; min-height:2px;
+               opacity:.75; }
+  .ritmo div:last-child { opacity:1; }
+  .ritmo-eixo { display:flex; justify-content:space-between; font-size:11px;
+                color:var(--fraco); margin-top:6px; }
+
+  /* ---- chegando ---- */
+  h2 { font-size:12px; text-transform:uppercase; letter-spacing:.1em; color:var(--fraco);
+       font-weight:600; margin:30px 0 12px; }
+  .fila { background:var(--carta); border:1px solid var(--linha); border-radius:16px;
+          overflow:hidden; }
+  .item { display:flex; align-items:center; gap:14px; padding:13px 18px;
+          border-bottom:1px solid var(--linha); }
+  .item:last-child { border-bottom:0; }
+  /* A linha mais recente entra destacada e desbota — é o que
+     transmite movimento sem precisar olhar o relógio. */
+  .item.novo { animation:entrou 2.5s ease-out; }
+  @keyframes entrou { from { background:#1d3550; } to { background:transparent; } }
+  .item .hora { font-size:13px; color:var(--fraco); font-variant-numeric:tabular-nums;
+                flex:none; width:46px; }
+  .item .nome { flex:1; min-width:0; }
+  .item .nome b { display:block; font-size:15px; font-weight:600; overflow-wrap:anywhere; }
+  .item .nome span { font-size:12.5px; color:var(--fraco); overflow-wrap:anywhere; }
+  .item .selo { flex:none; font-size:11px; font-weight:700; text-transform:uppercase;
+                letter-spacing:.05em; padding:3px 9px; border-radius:999px; }
+  .selo.aluno { background:rgba(59,157,251,.16); color:var(--azul); }
+  .selo.responsavel { background:rgba(52,211,153,.16); color:var(--verde); }
+  .selo.convidado { background:rgba(251,191,36,.16); color:var(--ambar); }
+  .item .por { flex:none; font-size:12px; color:var(--fraco); text-align:right; }
+  @media (max-width:620px) { .item .por { display:none; } }
+
+  /* O erro do banco, sem tradução. Aparece só quando não é um dos
+     casos conhecidos — e nesse ponto o texto cru vale mais que
+     qualquer paráfrase minha. */
+  .erro-cru { background:rgba(248,113,113,.12); border:1px solid rgba(248,113,113,.35);
+              color:var(--vermelho); border-radius:12px; padding:14px 16px; margin:0 0 16px;
+              font:13px/1.5 ui-monospace, Consolas, monospace; overflow-wrap:anywhere; }
+
+  /* ---- gestão de usuários ---- */
+  .g-topo { display:flex; align-items:center; justify-content:space-between;
+            gap:14px; margin:8px 0 18px; flex-wrap:wrap; }
+  .g-topo h2 { font-size:19px; color:var(--texto); text-transform:none; letter-spacing:-.02em; }
+
+  .abas { display:flex; gap:8px; margin-bottom:16px; }
+  .abas button { flex:1; min-height:46px; font:inherit; font-size:15px; font-weight:600;
+                 background:var(--carta); color:var(--fraco); border:1px solid var(--linha);
+                 border-radius:12px; cursor:pointer; }
+  .abas button[aria-pressed="true"] { background:var(--azul); border-color:var(--azul); color:#06121f; }
+
+  .g-busca { display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+  .g-busca input { flex:1 1 240px; min-width:0; }
+
+  /* A lupa mora dentro do campo, não ao lado: essa linha já divide
+     a largura com o botão de criar conta, e um ícone solto seria
+     mais uma coisa disputando espaço no celular. */
+  .g-lupa { position:relative; display:flex; align-items:center; flex:1 1 240px; min-width:0; }
+  .g-lupa svg { position:absolute; left:14px; top:50%; transform:translateY(-50%);
+                width:17px; height:17px; fill:none; stroke:var(--fraco); stroke-width:2;
+                stroke-linecap:round; pointer-events:none; }
+  .g-lupa input { flex:1; padding-left:40px; }
+  .g-lupa input:focus ~ svg { stroke:var(--azul); }
+  .g-nota { background:rgba(251,191,36,.1); border:1px solid rgba(251,191,36,.3);
+            color:var(--ambar); border-radius:12px; padding:14px 16px; margin:0 0 16px;
+            font-size:13.5px; line-height:1.5; }
+  .g-nota code { background:rgba(0,0,0,.25); padding:1px 6px; border-radius:5px; }
+
+  .g-linha { display:flex; align-items:center; gap:12px; background:var(--carta);
+             border:1px solid var(--linha); border-radius:12px;
+             padding:12px 16px; margin-bottom:8px; }
+  .g-linha .quem { flex:1; min-width:0; }
+  .g-linha .quem b { display:block; font-size:15px; overflow-wrap:anywhere; }
+  .g-linha .quem span { font-size:12.5px; color:var(--fraco); overflow-wrap:anywhere; }
+  .g-linha .btns { display:flex; gap:8px; flex:none; }
+  .g-linha button { font:inherit; font-size:13px; font-weight:600; padding:9px 13px;
+                    border-radius:9px; background:transparent; color:var(--texto);
+                    border:1px solid var(--linha); cursor:pointer; }
+  .g-linha button.perigo { color:var(--vermelho); border-color:rgba(248,113,113,.4); }
+  .g-linha select { font:inherit; font-size:13px; padding:8px 10px; border-radius:9px;
+                    background:var(--fundo); color:var(--texto); border:1px solid var(--linha); }
+
+  .g-selo { flex:none; font-size:11px; font-weight:700; text-transform:uppercase;
+            letter-spacing:.05em; padding:3px 9px; border-radius:999px; }
+  .g-selo.aluno { background:rgba(59,157,251,.16); color:var(--azul); }
+  .g-selo.externo { background:rgba(192,132,252,.16); color:#c084fc; }
+  .g-selo.responsavel { background:rgba(52,211,153,.16); color:var(--verde); }
+  .g-selo.counselor { background:rgba(56,189,248,.16); color:#38bdf8; }
+  .g-selo.docente { background:rgba(248,113,113,.16); color:var(--vermelho); }
+  .g-selo.inativo { background:rgba(148,163,184,.16); color:var(--fraco); }
+
+  /* O papel mostrado a quem não pode trocá-lo: mesma altura da
+     linha, sem parecer um controle clicável. */
+  .g-papel { flex:none; font-size:12.5px; color:var(--fraco); padding:9px 4px;
+             white-space:nowrap; }
+
+  /* ---- formulário ---- */
+  .veu { position:fixed; inset:0; background:rgba(4,8,14,.7); display:grid;
+         place-items:center; padding:18px; z-index:60; overflow:auto; }
+  .g-form { background:var(--carta); border:1px solid var(--linha); border-radius:16px;
+            padding:22px; max-width:460px; width:100%; max-height:92vh; overflow:auto; }
+  .g-form h3 { margin:0 0 4px; font-size:19px; }
+  .g-rot { display:block; font-size:12px; font-weight:650; color:var(--fraco);
+           margin:16px 0 6px; text-transform:uppercase; letter-spacing:.05em; }
+  .g-form input, .g-form select { width:100%; padding:12px 13px; font:inherit; font-size:16px;
+                                  border:1px solid var(--linha); border-radius:10px;
+                                  background:var(--fundo); color:var(--texto); }
+  .perfis { display:flex; gap:7px; flex-wrap:wrap; }
+  .perfis button { flex:1 1 auto; padding:10px 12px; font:inherit; font-size:13.5px;
+                   background:var(--fundo); color:var(--fraco); border:1px solid var(--linha);
+                   border-radius:10px; cursor:pointer; white-space:nowrap; }
+  .perfis button[aria-pressed="true"] { background:var(--azul); border-color:var(--azul);
+                                        color:#06121f; font-weight:700; }
+  .g-acoes { display:flex; gap:10px; margin-top:22px; }
+  .g-acoes button { flex:1; min-height:50px; }
+  .aviso-cru { background:rgba(248,113,113,.12); border:1px solid rgba(248,113,113,.35);
+               color:var(--vermelho); border-radius:10px; padding:12px 14px; margin:12px 0 0;
+               font-size:13.5px; line-height:1.45; }
+
+  .vazio { padding:30px 18px; text-align:center; color:var(--fraco); }
+  .rodape { margin-top:26px; font-size:12.5px; color:var(--fraco); }
+</style>
+</head>
+<body>
+<div class="env">
+
+  <header>
+    <div class="esq">
+      <img src="logo-email.png" alt="Alfacem Global Academy">
+      <div>
+        <p class="marca">Alfa University Fair</p>
+        <h1>Ao vivo</h1>
+      </div>
+    </div>
+    <div class="vivo" id="vivo">
+      <button type="button" class="fantasma oculto" id="btn-gestao">Gestão de usuários</button>
+      <span class="pulso" id="pulso"></span><span id="vivo-texto">conectando…</span>
+    </div>
+  </header>
+
+  <div class="acesso" id="deslogado">
+    <p class="msg" style="margin:0">Acesso restrito à direção. Entre com o e-mail cadastrado.</p>
+    <div id="passo-email">
+      <div class="linha">
+        <input type="email" id="email" placeholder="voce@exemplo.edu.br"
+               autocomplete="email" autocapitalize="none" spellcheck="false">
+        <button type="button" class="primario" id="btn-codigo">Enviar</button>
+      </div>
+    </div>
+    <div id="passo-codigo" class="oculto">
+      <div class="linha">
+        <input type="text" id="codigo" inputmode="numeric" maxlength="12" placeholder="00000000"
+               autocomplete="one-time-code">
+        <button type="button" class="primario" id="btn-entrar">Entrar</button>
+      </div>
+    </div>
+    <p class="msg" id="aviso"></p>
+  </div>
+
+  <div id="logado" class="oculto">
+    <p class="erro-cru oculto" id="erro-cru"></p>
+    <div class="grade" id="cartoes"></div>
+
+    <h2>Ritmo de entrada · últimas 3 horas</h2>
+    <div class="cartao">
+      <div class="ritmo" id="ritmo"></div>
+      <div class="ritmo-eixo" id="ritmo-eixo"></div>
+    </div>
+
+    <h2>Chegando agora</h2>
+    <div class="fila" id="fila"></div>
+
+    <p class="rodape">
+      <span id="quem-texto"></span> ·
+      <a href="#" id="sair" style="color:var(--azul)">sair</a> ·
+      atualiza sozinho a cada 20 segundos
+    </p>
+  </div>
+
+  <!-- ---- gestão de usuários ---- -->
+  <div id="gestao" class="oculto">
+    <div class="g-topo">
+      <h2 style="margin:0">Gestão de usuários</h2>
+      <button type="button" class="fantasma" id="g-voltar">← Voltar ao painel</button>
+    </div>
+
+    <div class="abas" id="g-abas">
+      <button type="button" data-g="pessoas" aria-pressed="true">Pessoas do evento</button>
+      <button type="button" data-g="contas" aria-pressed="false">Contas de acesso</button>
+    </div>
+
+    <p class="aviso-cru oculto" id="g-erro"></p>
+
+    <!-- pessoas -->
+    <div id="g-pessoas">
+      <div class="g-busca">
+        <input type="search" id="g-q" placeholder="Buscar por nome, e-mail ou código do crachá">
+        <button type="button" class="primario" id="g-novo">+ Nova pessoa</button>
+      </div>
+      <div id="g-lista"><p class="vazio">Digite um nome para buscar.</p></div>
+    </div>
+
+    <!-- contas -->
+    <div id="g-contas" class="oculto">
+      <p class="g-nota">A pessoa entra com e-mail e código de seis dígitos — não há
+        senha. Se o domínio do e-mail for novo, ele precisa estar liberado no n8n,
+        senão o código não chega.</p>
+      <div class="g-busca">
+        <!-- A lupa vem depois do campo no HTML só para o CSS poder
+             acender o ícone quando o campo recebe o foco. Onde ela
+             aparece é decidido pela posição absoluta, não pela ordem. -->
+        <label class="g-lupa">
+          <input type="search" id="c-q" aria-label="Buscar conta de acesso"
+                 placeholder="Buscar por nome, e-mail ou organização">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.4 15.4 L20 20"/>
+          </svg>
+        </label>
+        <button type="button" class="primario" id="g-nova-conta">+ Nova conta</button>
+      </div>
+      <div id="g-contas-lista"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ---- formulário de conta de acesso ---- -->
+<div class="veu oculto" id="c-veu">
+  <div class="g-form">
+    <h3>Nova conta de acesso</h3>
+    <p class="aviso-cru oculto" id="c-erro"></p>
+
+    <label class="g-rot" for="c-nome">Nome</label>
+    <input id="c-nome" type="text" placeholder="Nome e sobrenome">
+
+    <label class="g-rot" for="c-email">E-mail</label>
+    <input id="c-email" type="email" autocapitalize="none" spellcheck="false"
+           placeholder="é por ele que a pessoa entra">
+
+    <label class="g-rot" for="c-org">Organização</label>
+    <input id="c-org" type="text" placeholder="Universidade, colégio ou Rede Alfacem">
+
+    <label class="g-rot">Permissão</label>
+    <div class="perfis" id="c-papeis">
+      <button type="button" data-papel="avaliador" aria-pressed="true">Representante</button>
+      <button type="button" data-papel="palestras" aria-pressed="false">Palestras</button>
+      <button type="button" data-papel="atendente" aria-pressed="false">Credenciamento</button>
+      <button type="button" data-papel="gestor" aria-pressed="false">Organização</button>
+      <button type="button" data-papel="supervisor" aria-pressed="false">Supervisor</button>
+      <button type="button" data-papel="diretoria" aria-pressed="false">Diretoria</button>
+    </div>
+    <p class="msg" id="c-explica"></p>
+
+    <div class="g-acoes">
+      <button type="button" class="fantasma" id="c-cancelar">Cancelar</button>
+      <button type="button" class="primario" id="c-salvar">Criar conta</button>
+    </div>
+  </div>
+</div>
+
+<!-- ---- formulário de pessoa ---- -->
+<div class="veu oculto" id="g-veu">
+  <div class="g-form">
+    <h3 id="g-form-titulo">Nova pessoa</h3>
+    <p class="aviso-cru oculto" id="g-form-erro"></p>
+
+    <label class="g-rot">Tipo</label>
+    <div class="perfis" id="g-tipos">
+      <button type="button" data-tipo="aluno" aria-pressed="true">Aluno da Rede</button>
+      <button type="button" data-tipo="externo" aria-pressed="false">Aluno externo</button>
+      <button type="button" data-tipo="counselor" aria-pressed="false">Counselor</button>
+      <button type="button" data-tipo="docente" aria-pressed="false">Docente</button>
+      <button type="button" data-tipo="responsavel" aria-pressed="false">Responsável</button>
+    </div>
+
+    <label class="g-rot" for="g-nome">Nome completo</label>
+    <input id="g-nome" type="text" placeholder="Nome e sobrenome">
+
+    <div id="g-bloco-de" class="oculto">
+      <label class="g-rot" for="g-de">Acompanha quem</label>
+      <select id="g-de"></select>
+      <label class="g-rot" for="g-parentesco">Parentesco</label>
+      <input id="g-parentesco" type="text" placeholder="Mãe, Pai, Outro responsável legal">
+    </div>
+
+    <div id="g-bloco-inscrito">
+      <label class="g-rot" for="g-onde"><span id="g-rot-onde">Unidade</span></label>
+      <input id="g-onde" type="text" placeholder="Ex.: Barra Américas">
+
+      <div id="g-bloco-ano">
+        <label class="g-rot" for="g-ano">Ano de escolaridade</label>
+        <input id="g-ano" type="text" placeholder="Ex.: 2ª Série do Ensino Médio">
+      </div>
+
+      <label class="g-rot" for="g-resp-nome">Responsável</label>
+      <input id="g-resp-nome" type="text" placeholder="nome do responsável">
+
+      <label class="g-rot" for="g-resp-email">E-mail do responsável</label>
+      <input id="g-resp-email" type="email" autocapitalize="none" spellcheck="false">
+    </div>
+
+    <label class="g-rot" for="g-email">E-mail</label>
+    <input id="g-email" type="email" autocapitalize="none" spellcheck="false">
+
+    <label class="g-rot" for="g-telefone">Telefone</label>
+    <input id="g-telefone" type="tel">
+
+    <div class="g-acoes">
+      <button type="button" class="fantasma" id="g-cancelar">Cancelar</button>
+      <button type="button" class="primario" id="g-salvar">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL      = window.CONFIG.SUPABASE_URL;
+const SUPABASE_ANON_KEY = window.CONFIG.SUPABASE_ANON_KEY;
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+});
+
+const $ = s => document.querySelector(s);
+const esc = t => String(t == null ? '' : t)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const mostrar = (el, ver) => el.classList.toggle('oculto', !ver);
+const pct = (n, d) => d ? Math.round(n / d * 100) : 0;
+const hora = t => t ? new Date(t).toLocaleTimeString('pt-BR',
+  { hour: '2-digit', minute: '2-digit' }) : '';
+
+/* ============================================================
+   ACESSO — mesmo login das outras telas
+   ============================================================ */
+function avisar(txt, erro) {
+  $('#aviso').textContent = txt || '';
+  $('#aviso').className = 'msg' + (erro ? ' erro' : '');
+}
+
+/* O Supabase responde em inglês, e "Signups not allowed for otp"
+   não diz a ninguém que o problema é uma letra errada no endereço.
+   Traduzido para o que a pessoa pode fazer a respeito. */
+function erroDeLogin(e) {
+  const m = (e && e.message) || String(e);
+  return /Signups not allowed|signup_disabled/i.test(m)
+      ? 'E-mail não cadastrado. Confira se digitou o endereço completo.'
+    : /expired|invalid/i.test(m)
+      ? 'Código inválido ou expirado. Toque em Enviar para receber um novo — ' +
+        'e use o último que chegar, porque pedir um código novo cancela o anterior.'
+    : /rate limit|too many|429/i.test(m)
+      ? 'Muitos pedidos de código seguidos. Aguarde alguns minutos.'
+    : /Failed to fetch|NetworkError/i.test(m)
+      ? 'Sem conexão. Confira o wi-fi e tente de novo.'
+      : m;
+}
+
+$('#btn-codigo').addEventListener('click', async function () {
+  const email = $('#email').value.trim().toLowerCase();
+  if (!email) return avisar('Digite o e-mail.', true);
+  this.disabled = true;
+  avisar('Enviando…');
+  const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+  this.disabled = false;
+  if (error) return avisar(erroDeLogin(error), true);
+  mostrar($('#passo-email'), false);
+  mostrar($('#passo-codigo'), true);
+  avisar('Código enviado. Confira o e-mail — e o spam.');
+  $('#codigo').focus();
+});
+
+$('#btn-entrar').addEventListener('click', async function () {
+  const email = $('#email').value.trim().toLowerCase();
+
+  /* Só dígitos, e exatamente 6: no celular o código vai por cópia e
+     cola e vem com espaço, quebra de linha ou um pedaço do texto em
+     volta. Tentativa errada queima o código e obriga a pedir outro. */
+  const token = $('#codigo').value.replace(/\D/g, '');
+  if (token.length < 6) {
+    return avisar('Código incompleto. Confira o que chegou por e-mail.', true);
+  }
+
+  this.disabled = true;
+  avisar('Entrando…');
+  const { error } = await sb.auth.verifyOtp({ email, token, type: 'email' });
+  this.disabled = false;
+  if (error) return avisar(erroDeLogin(error), true);
+  avisar('');
+  iniciar();
+});
+
+$('#sair').addEventListener('click', async e => {
+  e.preventDefault();
+  await sb.auth.signOut();
+  location.reload();
+});
+
+/* ============================================================
+   O PAINEL
+   ============================================================ */
+let vistos = new Set();      // chaves já mostradas, para animar só o que é novo
+let primeira = true;
+
+/* Se o banco e esta página estiverem em versões diferentes — a
+   migration aplicada e o HTML antigo ainda no ar, ou o contrário —
+   a chave que o cartão lê pode não existir. Sem esta guarda o
+   número vira "undefined de 58" e a porcentagem vira "NaN%", que
+   se lê como dado errado em vez de página desatualizada.
+   Aconteceu ao publicar a 0048. */
+function cartao(classe, rotulo, presentes, total, obs) {
+  const temNumero = Number.isFinite(presentes) && Number.isFinite(total);
+
+  if (!temNumero) {
+    return `
+    <div class="cartao ${classe}">
+      <div class="rotulo">${esc(rotulo)}</div>
+      <div class="pct">—</div>
+      <div class="abs">Página desatualizada: republique esta tela.</div>
+      <div class="barra"><span style="width:0"></span></div>
+    </div>`;
+  }
+
+  const p = pct(presentes, total);
+  return `
+    <div class="cartao ${classe}">
+      <div class="rotulo">${esc(rotulo)}</div>
+      <div class="pct">${p}%</div>
+      <div class="abs">${presentes} de ${total}${obs ? ' · ' + esc(obs) : ''}</div>
+      <div class="barra"><span style="width:${p}%"></span></div>
+    </div>`;
+}
+
+function desenhar(d) {
+  const a = d.alunos, r = d.responsaveis, c = d.convidados, reps = d.reps;
+
+  /* Cada público num cartão. A média entre eles esconderia o caso
+     que mais importa: 80% dos alunos dentro com 30% dos
+     responsáveis é uma situação bem diferente de 55% e 55%. */
+  $('#cartoes').innerHTML =
+      cartao('c-alunos', 'Alunos dentro',        a.presentes, a.total)
+    + cartao('c-resp',   'Responsáveis dentro',  r.presentes, r.total)
+    + cartao('c-conv',   'Counselors e docentes', c.presentes, c.total)
+    + cartao('c-reps',   'Representantes presentes', reps.presentes, reps.total,
+             reps.credenciados + ' credenciados · ' + reps.contatos + ' contatos salvos');
+
+  /* ---- ritmo ---- */
+  const faixas = d.ritmo || [];
+  const teto = Math.max(1, ...faixas.map(f => f.n));
+  $('#ritmo').innerHTML = faixas.length
+    ? faixas.map(f => `<div style="height:${Math.round(f.n / teto * 100)}%" title="${f.faixa} · ${f.n}"></div>`).join('')
+    : '';
+  $('#ritmo-eixo').innerHTML = faixas.length
+    ? `<span>${esc(faixas[0].faixa)}</span><span>pico: ${teto} em 15 min</span><span>${esc(faixas[faixas.length - 1].faixa)}</span>`
+    : '<span>ninguém entrou nas últimas 3 horas</span>';
+
+  /* ---- chegando ---- */
+  const fila = d.chegando || [];
+  if (!fila.length) {
+    $('#fila').innerHTML = '<p class="vazio">Ninguém credenciado ainda.</p>';
+  } else {
+    $('#fila').innerHTML = fila.map(x => {
+      const chave = x.nome + '|' + x.em;
+      /* Na primeira carga nada pisca: seriam 40 linhas animando de
+         uma vez, o que parece defeito e não movimento. */
+      const novo = !primeira && !vistos.has(chave);
+      const selo = x.quem === 'responsavel' ? 'responsavel'
+                 : (x.tipo === 'counselor' || x.tipo === 'docente') ? 'convidado' : 'aluno';
+      const rotulo = selo === 'responsavel' ? 'responsável'
+                   : selo === 'convidado' ? x.tipo : 'aluno';
+      return `
+        <div class="item${novo ? ' novo' : ''}">
+          <span class="hora">${hora(x.em)}</span>
+          <span class="nome"><b>${esc(x.nome)}</b><span>${esc(x.onde || '')}</span></span>
+          <span class="selo ${selo}">${esc(rotulo)}</span>
+          <span class="por">${x.por ? 'por ' + esc(x.por) : ''}</span>
+        </div>`;
+    }).join('');
+    vistos = new Set(fila.map(x => x.nome + '|' + x.em));
+  }
+
+  mostrar($('#erro-cru'), false);
+  primeira = false;
+  $('#pulso').className = 'pulso';
+  $('#vivo-texto').textContent = 'ao vivo · ' + hora(d.agora);
+}
+
+async function atualizar() {
+  try {
+    const { data, error } = await sb.rpc('painel_evento');
+    if (error) throw error;
+    desenhar(data);
+  } catch (e) {
+    const m = (e && (e.message || e.hint || e.details)) ? (e.message || '') + ' ' + (e.details || '') : String(e);
+
+    /* Falha de rede não limpa a tela: os números de 20 segundos
+       atrás continuam valendo mais que uma tela em branco. O
+       ponto vermelho avisa que pararam de atualizar.
+
+       As três causas dizem o que fazer. "Sem conexão" para tudo
+       — que era o comportamento anterior — mandava procurar o
+       Wi-Fi quando o problema era uma migration não rodada. */
+    $('#pulso').className = 'pulso parado';
+
+    /* A ordem importa: `sem_permissao` e `nao_autenticado` são
+       decididos ANTES de "falta a migration". O erro de permissão
+       costuma citar o nome da função, e a regra antiga casava esse
+       nome e mandava rodar uma migration que já estava rodada —
+       exatamente o que apareceu quando um supervisor tentou entrar
+       antes de a conta dele existir. */
+    const semAcesso = /sem_permissao|nao_autenticado/.test(m);
+    const semFuncao = !semAcesso && /PGRST202|schema cache|does not exist/.test(m);
+
+    $('#vivo-texto').textContent =
+      semFuncao ? 'falta a migration 0035'
+      : semAcesso ? 'sem permissão'
+      : 'sem conexão';
+
+    if (semFuncao || semAcesso || /nao_autenticado/.test(m)) {
+      mostrar($('#deslogado'), true);
+      mostrar($('#logado'), false);
+      avisar(
+        semFuncao
+          ? 'O banco ainda não tem o painel do evento. Rode a migration ' +
+            '0035_painel_evento.sql no SQL Editor do Supabase.'
+        : semAcesso
+          ? 'Esta tela é para diretoria e supervisão. Se você deveria ter acesso, ' +
+            'peça à diretoria para conferir o papel da sua conta em Gestão de usuários.'
+          : 'Sessão expirada. Entre de novo.',
+        true);
+      return;
+    }
+
+    /* Erro que não é nenhum dos casos conhecidos: mostra o texto
+       do banco, cru. Duas vezes seguidas um defeito de SQL dentro
+       da função apareceu aqui como "sem conexão", e a mensagem
+       genérica mandou procurar o Wi-Fi. Feio na tela é melhor que
+       mudo. */
+    $('#erro-cru').textContent = m.trim();
+    mostrar($('#erro-cru'), true);
+  }
+}
+
+async function iniciar() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    mostrar($('#deslogado'), true);
+    mostrar($('#logado'), false);
+    $('#pulso').className = 'pulso parado';
+    $('#vivo-texto').textContent = 'desconectado';
+    return;
+  }
+
+  mostrar($('#deslogado'), false);
+  mostrar($('#logado'), true);
+  $('#quem-texto').textContent = session.user.email;
+  await atualizar();
+
+  /* O botão só aparece depois que o painel carregou de verdade —
+     ou seja, depois de o banco confirmar que a conta é diretoria.
+     Mostrar antes seria oferecer uma tela que vai recusar. */
+  mostrar($('#btn-gestao'), !$('#pulso').classList.contains('parado'));
+}
+
+/* ============================================================
+   GESTÃO DE USUÁRIOS
+
+   Duas populações com regras diferentes:
+
+   - pessoas do evento: criar, corrigir e excluir aqui mesmo
+   - contas de acesso: papel e revogação aqui; CRIAR login exige
+     a service_role e continua no terminal
+
+   Tudo passa por funções que exigem `diretoria` (0041). A tela
+   esconder o botão é conveniência; quem barra é o banco.
+   ============================================================ */
+let gTipo = 'aluno';
+let gEditando = null;   // objeto sendo corrigido, ou null para novo
+
+const gErro = (el, txt) => {
+  $(el).textContent = txt || '';
+  mostrar($(el), !!txt);
+};
+
+$('#btn-gestao').addEventListener('click', () => {
+  mostrar($('#logado'), false);
+  mostrar($('#gestao'), true);
+  window.scrollTo(0, 0);
+  buscarPessoas();
+});
+
+$('#g-voltar').addEventListener('click', () => {
+  mostrar($('#gestao'), false);
+  mostrar($('#logado'), true);
+  atualizar();
+});
+
+$('#g-abas').querySelectorAll('[data-g]').forEach(b => {
+  b.addEventListener('click', () => {
+    const alvo = b.dataset.g;
+    $('#g-abas').querySelectorAll('[data-g]').forEach(x =>
+      x.setAttribute('aria-pressed', String(x === b)));
+    mostrar($('#g-pessoas'), alvo === 'pessoas');
+    mostrar($('#g-contas'), alvo === 'contas');
+    gErro('#g-erro', '');
+    /* A aba abre limpa: com a busca de antes ainda no campo, a lista
+       apareceria cortada e pareceria que sumiram contas. */
+    if (alvo === 'contas') { $('#c-q').value = ''; carregarContas(); }
+  });
+});
+
+/* ---- pessoas ---- */
+const SELO = {
+  aluno: 'aluno', externo: 'externo', responsavel: 'responsável',
+  counselor: 'counselor', docente: 'docente'
+};
+
+function classeSelo(p) {
+  if (p.kind === 'responsavel') return 'responsavel';
+  if (p.tipo === 'counselor' || p.tipo === 'docente') return p.tipo;
+  return p.externo ? 'externo' : 'aluno';
+}
+
+let PESSOAS_ADMIN = [];
+
+async function buscarPessoas() {
+  const termo = $('#g-q').value.trim();
+  try {
+    const { data, error } = await sb.rpc('admin_pessoas', { p_busca: termo || null });
+    if (error) throw error;
+    PESSOAS_ADMIN = data || [];
+    gErro('#g-erro', '');
+    desenharPessoas();
+  } catch (e) {
+    const m = e && e.message ? e.message : String(e);
+    gErro('#g-erro', /admin_pessoas|PGRST202|schema cache/.test(m)
+      ? 'O banco ainda não tem a gestão de usuários. Rode a migration 0041_gestao_pessoas.sql.'
+      : m);
+  }
+}
+
+function desenharPessoas() {
+  /* Sem busca a lista sai cortada: são 800 pessoas, e desenhar
+     todas a cada tecla trava. Com busca, abre. */
+  const termo = $('#g-q').value.trim();
+  const teto = termo ? 60 : 25;
+  const parte = PESSOAS_ADMIN.slice(0, teto);
+
+  if (!parte.length) {
+    $('#g-lista').innerHTML = '<p class="vazio">Ninguém encontrado.</p>';
+    return;
+  }
+
+  $('#g-lista').innerHTML = parte.map((p, i) => {
+    const cls = classeSelo(p);
+    const onde = p.kind === 'responsavel'
+      ? [p.parentesco, 'acompanha ' + p.de_nome].filter(Boolean).join(' · ')
+      : [p.ano, p.unidade || p.colegio, p.codigo].filter(Boolean).join(' · ');
+    return `
+      <div class="g-linha">
+        <span class="g-selo ${cls}">${esc(SELO[cls] || cls)}</span>
+        <div class="quem">
+          <b>${esc(p.nome)}</b>
+          <span>${esc(onde)}${p.ativo === false ? ' · aguardando revisão' : ''}</span>
+        </div>
+        <div class="btns">
+          <button type="button" data-editar="${i}">Editar</button>
+          <button type="button" class="perigo" data-excluir="${i}">Excluir</button>
+        </div>
+      </div>`;
+  }).join('') + (PESSOAS_ADMIN.length > parte.length
+    ? `<p class="vazio">+ ${PESSOAS_ADMIN.length - parte.length} — refine a busca.</p>` : '');
+
+  $('#g-lista').querySelectorAll('[data-editar]').forEach(b =>
+    b.addEventListener('click', () => abrirForm(parte[+b.dataset.editar])));
+  $('#g-lista').querySelectorAll('[data-excluir]').forEach(b =>
+    b.addEventListener('click', () => excluir(parte[+b.dataset.excluir])));
+}
+
+let buscaTimer = null;
+$('#g-q').addEventListener('input', () => {
+  clearTimeout(buscaTimer);
+  buscaTimer = setTimeout(buscarPessoas, 350);
+});
+
+async function excluir(p) {
+  /* O aviso diz o que vai junto ANTES da pergunta. Apagar um
+     inscrito leva os acompanhantes dele, e quem clica precisa
+     saber disso enquanto ainda dá para desistir. */
+  const junto = p.kind === 'inscrito' && p.acompanhantes
+    ? `\n\nIsto apaga também ${p.acompanhantes} acompanhante(s) e os contatos que representantes salvaram dessa pessoa.`
+    : '';
+  if (!confirm(`Excluir ${p.nome}?${junto}\n\nNão tem desfazer.`)) return;
+
+  try {
+    const { error } = await sb.rpc('admin_excluir', { p_kind: p.kind, p_id: p.id });
+    if (error) throw error;
+    buscarPessoas();
+  } catch (e) {
+    gErro('#g-erro', 'Não excluiu: ' + (e.message || e));
+  }
+}
+
+/* ---- formulário ---- */
+$('#g-tipos').querySelectorAll('[data-tipo]').forEach(b => {
+  b.addEventListener('click', () => {
+    gTipo = b.dataset.tipo;
+    $('#g-tipos').querySelectorAll('[data-tipo]').forEach(x =>
+      x.setAttribute('aria-pressed', String(x === b)));
+    ajustarForm();
+  });
+});
+
+function ajustarForm() {
+  const resp = gTipo === 'responsavel';
+  mostrar($('#g-bloco-de'), resp);
+  mostrar($('#g-bloco-inscrito'), !resp);
+  mostrar($('#g-bloco-ano'), gTipo === 'aluno' || gTipo === 'externo');
+  $('#g-rot-onde').textContent =
+      gTipo === 'externo'   ? 'Colégio de origem'
+    : gTipo === 'counselor' ? 'Instituição'
+    : 'Unidade';
+}
+
+function abrirForm(p) {
+  gEditando = p || null;
+  gErro('#g-form-erro', '');
+
+  gTipo = !p ? 'aluno'
+        : p.kind === 'responsavel' ? 'responsavel'
+        : p.tipo === 'counselor' || p.tipo === 'docente' ? p.tipo
+        : p.externo ? 'externo' : 'aluno';
+
+  $('#g-tipos').querySelectorAll('[data-tipo]').forEach(x =>
+    x.setAttribute('aria-pressed', String(x.dataset.tipo === gTipo)));
+  /* Só a troca entre RESPONSÁVEL e inscrito atravessa tabela — são
+     tabelas diferentes, e nenhuma das duas funções de salvar move
+     linha de uma para a outra.
+
+     Aluno da Rede, aluno externo, counselor e docente moram todos
+     em `alunos`, e admin_salvar_inscrito troca entre eles de
+     propósito: manda `tipo` e `da_rede`, e a função reescreve
+     unidade/colégio conforme o caso. Travar esses quatro junto com
+     o responsável fechava o único jeito de consertar quem se
+     inscreveu na categoria errada — que é exatamente o que
+     acontece com aluno da Rede depois do prazo da 0034, quando a
+     opção some do formulário e a família marca "outro colégio". */
+  const ehResponsavel = !!p && p.kind === 'responsavel';
+  $('#g-tipos').querySelectorAll('[data-tipo]').forEach(x => {
+    x.disabled = !!p && (ehResponsavel || x.dataset.tipo === 'responsavel');
+  });
+
+  $('#g-form-titulo').textContent = p ? 'Editar ' + p.nome : 'Nova pessoa';
+  $('#g-nome').value = p ? p.nome : '';
+  $('#g-onde').value = p ? (p.unidade || p.colegio || '') : '';
+  $('#g-ano').value = p ? (p.ano || '') : '';
+  $('#g-email').value = p ? (p.email || '') : '';
+  $('#g-telefone').value = p ? (p.telefone || '') : '';
+  $('#g-resp-nome').value = p ? (p.resp_nome || '') : '';
+  $('#g-resp-email').value = p ? (p.resp_email || '') : '';
+  $('#g-parentesco').value = p ? (p.parentesco || '') : '';
+
+  /* A lista de inscritos para amarrar um responsável sai do que
+     já está carregado — o responsável se cria a partir de uma
+     busca, então o inscrito dele costuma estar ali. */
+  const inscritos = PESSOAS_ADMIN.filter(x => x.kind === 'inscrito');
+  $('#g-de').innerHTML = inscritos.length
+    ? inscritos.map(x => `<option value="${esc(x.id)}"${p && p.de_id === x.id ? ' selected' : ''}>${esc(x.nome)}</option>`).join('')
+    : '<option value="">busque o inscrito primeiro</option>';
+
+  ajustarForm();
+  mostrar($('#g-veu'), true);
+  $('#g-nome').focus();
+}
+
+$('#g-novo').addEventListener('click', () => abrirForm(null));
+$('#g-cancelar').addEventListener('click', () => mostrar($('#g-veu'), false));
+$('#g-veu').addEventListener('click', e => {
+  if (e.target === $('#g-veu')) mostrar($('#g-veu'), false);
+});
+
+$('#g-salvar').addEventListener('click', async function () {
+  const nome = $('#g-nome').value.trim();
+  if (!nome) return gErro('#g-form-erro', 'Informe o nome.');
+
+  this.disabled = true;
+  gErro('#g-form-erro', '');
+
+  try {
+    if (gTipo === 'responsavel') {
+      const de = $('#g-de').value;
+      if (!de && !gEditando) throw new Error('Escolha de quem esta pessoa é responsável.');
+      const { error } = await sb.rpc('admin_salvar_responsavel', { p_dados: {
+        id: gEditando ? gEditando.id : null,
+        de_id: de || null,
+        nome,
+        parentesco: $('#g-parentesco').value.trim(),
+        email: $('#g-email').value.trim(),
+        telefone: $('#g-telefone').value.trim()
+      }});
+      if (error) throw error;
+    } else {
+      const { error } = await sb.rpc('admin_salvar_inscrito', { p_dados: {
+        id: gEditando ? gEditando.id : null,
+        tipo: gTipo === 'externo' ? 'aluno' : gTipo,
+        da_rede: gTipo !== 'externo' && gTipo !== 'counselor',
+        nome,
+        onde: $('#g-onde').value.trim(),
+        ano: $('#g-ano').value.trim(),
+        email: $('#g-email').value.trim(),
+        telefone: $('#g-telefone').value.trim(),
+        resp_nome: $('#g-resp-nome').value.trim(),
+        resp_email: $('#g-resp-email').value.trim(),
+        ativo: true
+      }});
+      if (error) throw error;
+    }
+
+    mostrar($('#g-veu'), false);
+    buscarPessoas();
+  } catch (e) {
+    const m = e && e.message ? e.message : String(e);
+    gErro('#g-form-erro',
+      /nome_incompleto/.test(m) ? 'Informe o nome completo, com sobrenome.' :
+      /inscrito_obrigatorio|inscrito_invalido/.test(m) ? 'Escolha de quem esta pessoa é responsável.' :
+      m);
+  } finally {
+    this.disabled = false;
+  }
+});
+
+/* ---- contas de acesso ---- */
+/* A ordem aqui é a do menu suspenso de cada linha, e ela sobe do
+   acesso mais estreito para o mais largo. */
+const PAPEIS = {
+  avaliador:  'Representante',
+  palestras:  'Palestras',
+  atendente:  'Credenciamento',
+  gestor:     'Organização',
+  supervisor: 'Supervisor',
+  diretoria:  'Diretoria'
+};
+
+/* O que cada permissão abre. Escrito na tela porque a diferença
+   entre gestor e diretoria não é óbvia pelo nome — e escolher
+   errado ou tranca alguém fora do trabalho, ou entrega a lista
+   completa de menores a quem não precisa dela. */
+const EXPLICA = {
+  avaliador: 'Abre o app de escanear crachá e salvar contatos. Não vê listas nem painéis.',
+  palestras: 'Abre só a lista de presença das palestras, dentro do credenciamento. ' +
+             'Não vê a mesa de entrada nem o painel.',
+  atendente: 'Abre só a mesa de entrada: marcar presença, inscrever no local, crachá avulso. ' +
+             'Não vê o painel de inscrições nem a exportação.',
+  gestor: 'Abre o painel de inscrições e o credenciamento do dia, com nomes e contatos.',
+  supervisor: 'Abre esta tela inteira e cadastra representante. Não muda papel de ninguém, ' +
+              'não revoga e não apaga conta.',
+  diretoria: 'Tudo do gestor, mais o painel ao vivo e esta tela de gestão.'
+};
+
+/* Descoberto na própria lista de contas: admin_contas marca com
+   `eu` a linha de quem chamou. Evita uma consulta a mais só para
+   perguntar ao banco quem sou.
+
+   Serve para ESCONDER botão, não para proteger nada — a 0043 tranca
+   admin_papel, admin_revogar e admin_apagar_conta na diretoria, e é
+   lá que a decisão vale. Aqui é para o supervisor não clicar em
+   coisa que vai responder `sem_permissao`. */
+let MEU_PAPEL = null;
+const souDiretoria = () => MEU_PAPEL === 'diretoria';
+
+let cPapel = 'avaliador';
+
+function explicarPapel() {
+  $('#c-explica').textContent = EXPLICA[cPapel];
+}
+
+$('#c-papeis').querySelectorAll('[data-papel]').forEach(b => {
+  b.addEventListener('click', () => {
+    cPapel = b.dataset.papel;
+    $('#c-papeis').querySelectorAll('[data-papel]').forEach(x =>
+      x.setAttribute('aria-pressed', String(x === b)));
+    explicarPapel();
+  });
+});
+
+$('#g-nova-conta').addEventListener('click', () => {
+  ['#c-nome', '#c-email', '#c-org'].forEach(s => { $(s).value = ''; });
+  cPapel = 'avaliador';
+  $('#c-papeis').querySelectorAll('[data-papel]').forEach(x =>
+    x.setAttribute('aria-pressed', String(x.dataset.papel === 'avaliador')));
+
+  /* Supervisor só cria representante. A 0043 recusa o resto dentro
+     do banco, com `papel_acima_do_seu`; esconder aqui evita oferecer
+     um botão que só serve para dar erro. */
+  $('#c-papeis').querySelectorAll('[data-papel]').forEach(x =>
+    mostrar(x, souDiretoria() || x.dataset.papel === 'avaliador'));
+
+  explicarPapel();
+  gErro('#c-erro', '');
+  mostrar($('#c-veu'), true);
+  $('#c-nome').focus();
+});
+
+$('#c-cancelar').addEventListener('click', () => mostrar($('#c-veu'), false));
+$('#c-veu').addEventListener('click', e => {
+  if (e.target === $('#c-veu')) mostrar($('#c-veu'), false);
+});
+
+$('#c-salvar').addEventListener('click', async function () {
+  const nome = $('#c-nome').value.trim();
+  const email = $('#c-email').value.trim().toLowerCase();
+  if (!nome) return gErro('#c-erro', 'Informe o nome.');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    return gErro('#c-erro', 'Confira o e-mail — é por ele que a pessoa entra.');
+  }
+
+  this.disabled = true;
+  gErro('#c-erro', '');
+
+  try {
+    const { data, error } = await sb.rpc('admin_criar_conta', { p_dados: {
+      nome, email, organizacao: $('#c-org').value.trim(), papel: cPapel
+    }});
+    if (error) throw error;
+
+    mostrar($('#c-veu'), false);
+    carregarContas();
+
+    /* "Já existia" não é erro: é o caso de quem teve o acesso
+       revogado e está voltando. Vale dizer, para ninguém achar
+       que criou duplicado. */
+    if (!data.novo) {
+      gErro('#g-erro', 'Esse e-mail já tinha conta no sistema — o acesso foi devolvido ' +
+        'com a permissão escolhida, sem criar outra.');
+    }
+  } catch (e) {
+    const m = e && e.message ? e.message : String(e);
+    gErro('#c-erro',
+      /email_invalido/.test(m)   ? 'Confira o e-mail digitado.' :
+      /nome_obrigatorio/.test(m) ? 'Informe o nome.' :
+      /papel_acima_do_seu/.test(m) ? 'Sua permissão só cria conta de Representante.' :
+      /conta_protegida/.test(m)  ? 'Esse e-mail já pertence a uma conta de nível acima do seu. ' +
+                                   'Peça à diretoria.' :
+      /nao_altera_a_si/.test(m)  ? 'Não dá para alterar a própria conta por aqui.' :
+      /admin_criar_conta|PGRST202|schema cache/.test(m)
+        ? 'O banco ainda não tem a criação de contas. Rode a migration 0042_criar_conta.sql.'
+        : m);
+  } finally {
+    this.disabled = false;
+  }
+});
+
+let CONTAS = [];
+
+/* Sem acento e sem caixa alta: quem digita "angelica" tem de achar
+   "Angélica". Buscar por igualdade literal só serviria para quem já
+   sabe o nome escrito exatamente como está no cadastro — e nesse
+   caso não precisaria buscar. */
+const simples = t => String(t == null ? '' : t)
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+async function carregarContas() {
+  try {
+    const { data, error } = await sb.rpc('admin_contas');
+    if (error) throw error;
+    CONTAS = data || [];
+    const eu = CONTAS.find(c => c.eu);
+    MEU_PAPEL = eu ? eu.papel : null;
+    desenharContas();
+  } catch (e) {
+    const m = e && e.message ? e.message : String(e);
+    gErro('#g-erro', /admin_contas|PGRST202|schema cache/.test(m)
+      ? 'O banco ainda não tem a gestão de usuários. Rode a migration 0041_gestao_pessoas.sql.'
+      : m);
+  }
+}
+
+/* Filtra no navegador, sem ida ao banco: são algumas dezenas de
+   contas, já em memória. Ir ao servidor a cada tecla atrasaria o
+   que hoje responde na hora. */
+function desenharContas() {
+  const termos = simples($('#c-q').value.trim()).split(/\s+/).filter(Boolean);
+
+  /* Cada palavra tem de aparecer em algum lugar da linha — assim
+     "aline unifase" acha, mesmo com o nome e a organização longe um
+     do outro no texto. */
+  const lista = termos.length
+    ? CONTAS.filter(c => {
+        const alvo = simples([c.nome, c.email, c.organizacao].join(' '));
+        return termos.every(t => alvo.includes(t));
+      })
+    : CONTAS;
+
+  if (!lista.length) {
+    $('#g-contas-lista').innerHTML = `<p class="vazio">${
+      CONTAS.length ? 'Nenhuma conta com esse termo.' : 'Nenhuma conta de acesso ainda.'
+    }</p>`;
+    return;
+  }
+
+  /* O índice do botão aponta para a lista FILTRADA, e é por isso
+     que as três buscas de handler abaixo leem `lista`: com o campo
+     preenchido, o terceiro botão da tela não é mais o terceiro do
+     banco — apagar pela posição original apagaria outra pessoa. */
+  $('#g-contas-lista').innerHTML = lista.map((c, i) => `
+    <div class="g-linha">
+      <div class="quem">
+        <b>${esc(c.nome)}${c.eu ? ' · você' : ''}</b>
+        <span>${esc(c.email)}${c.organizacao ? ' · ' + esc(c.organizacao) : ''}${
+          c.contatos ? ' · ' + c.contatos + ' contato(s) salvo(s)' : ''}</span>
+      </div>
+      <div class="btns">
+        ${souDiretoria() ? `
+        <select data-papel="${i}"${c.eu ? ' disabled' : ''}>
+          ${Object.keys(PAPEIS).map(p =>
+            `<option value="${p}"${c.papel === p ? ' selected' : ''}>${PAPEIS[p]}</option>`).join('')}
+        </select>
+        <button type="button" data-revogar="${i}"${c.eu ? ' disabled' : ''}>Revogar</button>
+        <button type="button" class="perigo" data-apagar="${i}"${c.eu ? ' disabled' : ''}>Apagar</button>`
+        : `<span class="g-papel">${esc(PAPEIS[c.papel] || c.papel)}</span>`}
+      </div>
+    </div>`).join('') + (termos.length
+      ? `<p class="vazio">${lista.length} de ${CONTAS.length} conta(s).</p>` : '');
+
+  $('#g-contas-lista').querySelectorAll('[data-papel]').forEach(s => {
+    const c = lista[+s.dataset.papel];
+    s.addEventListener('change', async () => {
+      try {
+        const { error } = await sb.rpc('admin_papel', { p_id: c.id, p_papel: s.value });
+        if (error) throw error;
+        carregarContas();
+      } catch (e) { gErro('#g-erro', 'Não mudou o papel: ' + (e.message || e)); }
+    });
+  });
+
+  /* Duas saídas, e a diferença importa:
+
+     REVOGAR  tira o acesso e guarda tudo. É para quem saiu da
+              função e pode voltar — devolver é criar a conta de
+              novo com o mesmo e-mail, e os contatos reaparecem.
+
+     APAGAR   some com a conta e com os contatos que a pessoa
+              salvou. É para cadastro errado, feito agora. */
+  $('#g-contas-lista').querySelectorAll('[data-revogar]').forEach(b => {
+    const c = lista[+b.dataset.revogar];
+    b.addEventListener('click', async () => {
+      if (!confirm(`Revogar o acesso de ${c.nome}?\n\n` +
+        'Ela deixa de abrir qualquer tela do sistema. Os contatos que ela salvou ' +
+        'continuam no banco, e devolver o acesso é criar a conta de novo com o ' +
+        'mesmo e-mail.')) return;
+      try {
+        const { error } = await sb.rpc('admin_revogar', { p_id: c.id });
+        if (error) throw error;
+        carregarContas();
+      } catch (e) { gErro('#g-erro', 'Não revogou: ' + (e.message || e)); }
+    });
+  });
+
+  $('#g-contas-lista').querySelectorAll('[data-apagar]').forEach(b => {
+    const c = lista[+b.dataset.apagar];
+    b.addEventListener('click', async () => {
+      const perde = c.contatos
+        ? `\n\nIsto apaga também os ${c.contatos} contato(s) que ${c.nome} salvou no evento.`
+        : '';
+      if (!confirm(`Apagar a conta de ${c.nome} definitivamente?${perde}\n\n` +
+        'Não tem desfazer. Para só tirar o acesso e poder devolver depois, ' +
+        'use Revogar.')) return;
+      try {
+        const { error } = await sb.rpc('admin_apagar_conta', { p_id: c.id });
+        if (error) throw error;
+        carregarContas();
+      } catch (e) {
+        const m = e && e.message ? e.message : String(e);
+        gErro('#g-erro', /admin_apagar_conta|PGRST202/.test(m)
+          ? 'Rode a migration 0042_criar_conta.sql para habilitar isso.'
+          : 'Não apagou: ' + m);
+      }
+    });
+  });
+}
+
+/* Sem espera de digitação: a lista já está no navegador, e atrasar
+   350ms como na busca de pessoas só faria a tela parecer lenta. */
+$('#c-q').addEventListener('input', desenharContas);
+
+/* Aba escondida não consulta: o celular fica no bolso a maior
+   parte do tempo, e atualizar de 20 em 20 segundos ali só gasta
+   bateria e dados. Ao voltar, atualiza na hora. */
+setInterval(() => {
+  /* Gestão aberta não é redesenhada por baixo: o formulário some
+     no meio da digitação. */
+  if (!document.hidden && $('#gestao').classList.contains('oculto')) atualizar();
+}, 20000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) atualizar(); });
+
+iniciar();
+</script>
+</body>
+</html>

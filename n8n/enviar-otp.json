@@ -1,0 +1,131 @@
+{
+  "name": "Enviar OTP dos avaliadores",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "otp-avaliadores",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "name": "Webhook do Supabase",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-380, 0],
+      "webhookId": "a1000000-0000-4000-8000-000000000001",
+      "notes": "URL vai em Supabase > Authentication > Hooks > Send Email Hook"
+    },
+    {
+      "parameters": {
+        "jsCode": "/* ============================================================\n   Valida o payload do Send Email Hook e extrai o codigo.\n\n   O Supabase manda:\n     body.user.email                    -> destinatario\n     body.email_data.token              -> os 6 digitos\n     body.email_data.email_action_type  -> 'magiclink' no login por OTP\n\n   IMPORTANTE: este no NUNCA lanca excecao.\n\n   Quando um no estoura com responseMode = responseNode, o\n   workflow morre antes de chegar no no de resposta e o n8n\n   devolve 200 com corpo vazio. O Supabase leria isso como\n   'e-mail entregue' e o avaliador esperaria por um codigo que\n   nunca foi enviado. Quem decide o status HTTP e o no IF.\n\n   ORDEM DOS NOS: o Supabase derruba o hook em 5 segundos. Por\n   isso o no de resposta vem ANTES do envio pelo Gmail — chamar\n   a API do Google primeiro estourava o limite e o login falhava\n   com 'Failed to reach hook'. No n8n o workflow continua depois\n   do Respond to Webhook, entao o e-mail sai normalmente.\n   ============================================================ */\n\n/* Dominios autorizados a receber codigo.\n\n   Este e o unico freio contra alguem que descubra a URL deste\n   webhook e passe a usa-lo para disparar e-mail em nome do seu\n   dominio. Liste os dominios dos avaliadores (empresas, escolas,\n   universidades parceiras).\n\n   Array vazio = aceita qualquer dominio. So faca isso se nao\n   houver como enumerar os dominios antes do evento. */\nconst DOMINIOS_PERMITIDOS = [\n  'alfacem.com.br'\n];\n\nconst corpo  = $input.first().json.body || {};\nconst email  = (corpo.user && corpo.user.email || '').toLowerCase().trim();\nconst codigo = corpo.email_data && corpo.email_data.token;\nconst tipo   = corpo.email_data && corpo.email_data.email_action_type;\n\n/* Nas recusas o codigo nao vai adiante de proposito: assim ele\n   nao fica gravado no historico de execucao do n8n. */\nif (!email || !codigo) {\n  return [{ json: { ok: false, motivo: 'payload_invalido', email, tipo } }];\n}\n\nif (DOMINIOS_PERMITIDOS.length) {\n  const dominio = email.split('@')[1] || '';\n  if (!DOMINIOS_PERMITIDOS.includes(dominio)) {\n    return [{ json: { ok: false, motivo: 'dominio_nao_permitido', email, tipo } }];\n  }\n}\n\nreturn [{ json: { ok: true, email, codigo, tipo } }];"
+      },
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "name": "Validar payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-160, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-ok",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": "",
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1000000-0000-4000-8000-000000000005",
+      "name": "Payload válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [60, 0]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.codigo }} é o seu código de acesso",
+        "emailType": "html",
+        "message": "=<div style=\"font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#14181f\">\n  <h2 style=\"margin:0 0 4px;font-size:20px\">Captura de contatos</h2>\n  <p style=\"margin:0 0 24px;color:#5a6474\">Seu código de acesso de avaliador:</p>\n\n  <div style=\"background:#e8eefb;border-radius:12px;padding:20px;text-align:center;margin-bottom:24px\">\n    <span style=\"font-size:34px;font-weight:700;letter-spacing:.25em;color:#0f3d8a\">{{ $json.codigo }}</span>\n  </div>\n\n  <p style=\"margin:0 0 8px;font-size:14px;color:#5a6474\">O código expira em 1 hora e só pode ser usado uma vez.</p>\n  <p style=\"margin:0;font-size:14px;color:#5a6474\">Se você não pediu este código, ignore este e-mail.</p>\n</div>",
+        "options": {
+          "senderName": "Captura de Contatos"
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000004",
+      "name": "200 recebido",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [300, -120],
+      "notes": "Responde ANTES de enviar. O Supabase derruba o hook em 5s."
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.codigo }} é o seu código de acesso",
+        "emailType": "html",
+        "message": "=<div style=\"font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#14181f\">\n  <h2 style=\"margin:0 0 4px;font-size:20px\">Captura de contatos</h2>\n  <p style=\"margin:0 0 24px;color:#5a6474\">Seu código de acesso de avaliador:</p>\n\n  <div style=\"background:#e8eefb;border-radius:12px;padding:20px;text-align:center;margin-bottom:24px\">\n    <span style=\"font-size:34px;font-weight:700;letter-spacing:.25em;color:#0f3d8a\">{{ $json.codigo }}</span>\n  </div>\n\n  <p style=\"margin:0 0 8px;font-size:14px;color:#5a6474\">O código expira em 1 hora e só pode ser usado uma vez.</p>\n  <p style=\"margin:0;font-size:14px;color:#5a6474\">Se você não pediu este código, ignore este e-mail.</p>\n</div>",
+        "options": {
+          "senderName": "Captura de Contatos"
+        }
+      },
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "name": "Enviar e-mail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [540, -120],
+      "notes": "Roda DEPOIS da resposta. Falha aqui marca a execução como erro e fica visível em Executions."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ error: { http_code: 400, message: $json.motivo } }) }}",
+        "options": { "responseCode": 400 }
+      },
+      "id": "a1000000-0000-4000-8000-000000000007",
+      "name": "400 payload recusado",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [300, 160],
+      "notes": "Payload malformado ou domínio fora da lista."
+    }
+  ],
+  "connections": {
+    "Webhook do Supabase": {
+      "main": [[{ "node": "Validar payload", "type": "main", "index": 0 }]]
+    },
+    "Validar payload": {
+      "main": [[{ "node": "Payload válido?", "type": "main", "index": 0 }]]
+    },
+    "Payload válido?": {
+      "main": [
+        [{ "node": "200 recebido", "type": "main", "index": 0 }],
+        [{ "node": "400 payload recusado", "type": "main", "index": 0 }]
+      ]
+    },
+    "200 recebido": {
+      "main": [[{ "node": "Enviar e-mail", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all"
+  },
+  "pinData": {}
+}

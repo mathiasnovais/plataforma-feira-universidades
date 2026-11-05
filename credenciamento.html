@@ -1,0 +1,1457 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1478d0">
+<link rel="icon" type="image/png" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-192.png">
+<title>Credenciamento · Alfa University Fair</title>
+
+<!-- URL e chave anon do projeto: copie config.exemplo.js para config.js -->
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+<style>
+  :root { --azul:#1478d0; --azul-escuro:#0f5ca3; --verde:#0a7d4b; --vermelho:#b02020;
+          --texto:#201e1d; --cinza:#605d5d; --linha:#e3e0e0; --fundo:#f3f2f2; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--fundo); color:var(--texto);
+         font:16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .env { max-width:820px; margin:0 auto; padding:18px 16px 80px; }
+
+  /* Faixa azul no topo: a tela fica aberta o dia inteiro num
+     tablet apoiado na mesa, e de longe é a cor que identifica de
+     qual sistema é aquela tela. */
+  .faixa { height:5px; background:linear-gradient(90deg, var(--azul), #3aa0f0 60%, var(--vermelho)); }
+
+  header { display:flex; align-items:center; justify-content:space-between; gap:16px;
+           padding:18px 0 16px; border-bottom:1px solid var(--linha); }
+  header .esq { display:flex; align-items:center; gap:14px; min-width:0; }
+  header img { height:34px; width:auto; flex:none; }
+  header .risco { width:1px; height:34px; background:var(--linha); flex:none; }
+  .marca { font:600 10px/1.4 inherit; letter-spacing:.16em; text-transform:uppercase;
+           color:var(--vermelho); margin:0 0 2px; }
+  h1 { margin:0; font-size:20px; letter-spacing:-.02em; line-height:1.15; }
+  header a { font-size:13px; color:var(--azul); font-weight:600; white-space:nowrap; }
+  @media (max-width:560px) {
+    header img { height:28px; }
+    header .risco { display:none; }
+    h1 { font-size:17px; }
+  }
+
+  button { font:inherit; cursor:pointer; border:0; border-radius:10px; }
+  .primario { background:var(--azul); color:#fff; padding:13px 18px; font-weight:600; }
+  .primario:active { background:var(--azul-escuro); }
+  .primario:disabled { background:#c3bfbe; cursor:default; }
+  .secundario { background:#fff; color:var(--texto); border:1px solid var(--linha); padding:12px 16px; }
+  input, select { font:inherit; width:100%; padding:13px 14px; border:1px solid var(--linha);
+                  border-radius:10px; background:#fff; color:var(--texto); }
+  input:focus, select:focus { outline:none; border-color:var(--azul); box-shadow:0 0 0 3px #e7f1fb; }
+
+  .acesso { background:#fff; border:1px solid var(--linha); padding:20px; margin:20px 0;
+            border-radius:12px; }
+  .acesso .linha { display:flex; gap:10px; margin-top:12px; }
+  .oculto { display:none !important; }
+  .msg { font-size:13.5px; color:var(--cinza); margin:10px 0 0; }
+  .msg.erro { color:var(--vermelho); }
+
+  /* ---- placar ----
+
+     A barra não é enfeite: com 750 esperados, "312 de 746" não
+     diz de relance se o movimento está no começo ou no fim. A
+     proporção diz. */
+  .placar { background:#fff; border:1px solid var(--linha); border-radius:14px;
+            padding:18px 20px; margin:18px 0; box-shadow:0 1px 2px rgba(32,30,29,.05); }
+  .placar .numeros { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  .placar .grande { font-size:38px; font-weight:700; line-height:1;
+                    letter-spacing:-.03em; color:var(--verde);
+                    font-variant-numeric:tabular-nums; }
+  .placar .de { font-size:16px; color:var(--cinza); }
+  .placar .de b { font-variant-numeric:tabular-nums; color:var(--texto); }
+  .placar .faltam { margin-left:auto; font-size:14px; color:var(--cinza); }
+
+  .barra { height:10px; border-radius:999px; background:var(--fundo);
+           margin-top:14px; overflow:hidden; }
+  .barra span { display:block; height:100%; border-radius:999px;
+                background:linear-gradient(90deg, var(--verde), #2fa96e);
+                transition:width .4s ease; }
+
+  /* ---- busca ---- */
+
+  .busca { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:12px; }
+  /* min-width:0 deixa o campo encolher; sem ele o campo de busca
+     tem 240px de piso e espreme o resto da linha. Era o que
+     quebrava "só quem falta" em três linhas. */
+  .busca input { flex:1 1 200px; min-width:0; }
+  .busca label { flex:none; white-space:nowrap;
+                 font-size:14px; color:var(--cinza); display:flex; align-items:center; gap:6px; }
+  .busca button { flex:none; }
+
+  /* ---- leitor de crachá ----
+
+     O vídeo fica DENTRO do fluxo, acima da lista, e não num véu:
+     a mesa alterna entre apontar a câmera e conferir a lista, e
+     um modal esconderia exatamente o que ela precisa ver.
+
+     O resultado fica grande e colorido porque é lido de relance,
+     com a próxima pessoa já estendendo o crachá: verde = entra,
+     âmbar = já estava (confere o papel!), vermelho = não achei. */
+  .leitor-caixa { background:#fff; border:1px solid var(--linha); border-radius:14px;
+                  padding:14px; margin-bottom:12px; }
+  #leitor-cred { max-width:380px; margin:0 auto; border-radius:10px; overflow:hidden;
+                 background:#201e1d; }
+  #leitor-cred video { display:block; width:100%; }
+  .leitor-caixa .acoes { display:flex; gap:10px; margin-top:12px; }
+  .leitor-caixa .acoes button { flex:1; }
+
+  .scan-resultado { border-radius:12px; padding:14px 16px; margin-top:12px;
+                    border:1px solid transparent; }
+  .scan-resultado b { display:block; font-size:19px; line-height:1.25;
+                      overflow-wrap:anywhere; }
+  .scan-resultado span { display:block; font-size:13.5px; margin-top:2px; }
+  .scan-resultado .status { font-weight:600; font-size:14px; margin-top:6px; }
+  .scan-resultado.ok      { background:#f4fbf7; border-color:#bfe3cf; }
+  .scan-resultado.ok      .status { color:var(--verde); }
+  .scan-resultado.atencao { background:#fdf6e7; border-color:#ecd9a8; }
+  .scan-resultado.atencao .status { color:#8a6400; }
+  .scan-resultado.erro    { background:#fdf0f0; border-color:#eccaca; }
+  .scan-resultado.erro    .status { color:var(--vermelho); }
+
+  /* ---- abas ---- */
+  .abas { display:flex; gap:8px; margin-bottom:16px; }
+  .abas button {
+    flex:1; min-height:48px; padding:12px 14px; font:inherit; font-size:15px;
+    background:#fff; color:var(--cinza); border:1px solid var(--linha);
+    border-radius:12px; cursor:pointer; font-weight:600;
+  }
+  .abas button[aria-pressed="true"] {
+    background:var(--azul); border-color:var(--azul); color:#fff;
+  }
+
+  /* ---- lista ---- */
+  /* A linha inteira é o alvo do toque, e precisa parecer isso:
+     cursor de mão, borda que reage e um leve afundar ao apertar.
+     Sem esses três sinais, quem nunca usou a tela fica procurando
+     onde clicar. */
+  .pessoa { display:flex; align-items:center; gap:12px; background:#fff;
+            border:1px solid var(--linha); border-radius:12px; padding:12px 14px; margin-bottom:8px;
+            cursor:pointer; transition:border-color .12s ease, box-shadow .12s ease, transform .06s ease; }
+  .pessoa:hover { border-color:var(--azul); box-shadow:0 1px 6px rgba(20,120,208,.12); }
+  .pessoa:active { transform:scale(.995); }
+  .pessoa.presente { border-color:#bfe3cf; background:#f4fbf7; }
+  .pessoa.presente:hover { border-color:var(--verde); box-shadow:0 1px 6px rgba(10,125,75,.12); }
+  .pessoa .quem { flex:1; min-width:0; }
+  .pessoa .quem b { display:block; font-size:16px; line-height:1.25; overflow-wrap:anywhere; }
+  .pessoa .quem span { display:block; font-size:13px; color:var(--cinza); overflow-wrap:anywhere; }
+
+  /* ---- UM ALVO SÓ POR LINHA ----
+
+     A caixinha à esquerda é ESTADO, não controle: redonda, sem
+     borda de campo, sem sombra. Redonda de propósito — quadrado
+     com borda é a forma universal de "clique aqui", e era isso
+     que fazia a linha ter dois alvos aparentes disputando o dedo.
+
+     O botão à direita é a única coisa que parece apertável. */
+  .caixa { width:26px; height:26px; flex:none; border-radius:50%;
+           background:#eceaea; display:grid; place-items:center;
+           font-size:15px; color:#fff; }
+  .pessoa.presente .caixa { background:var(--verde); }
+
+  .acao { flex:none; display:inline-flex; align-items:center; gap:7px;
+          font:inherit; font-size:14.5px; font-weight:700; white-space:nowrap;
+          min-height:44px; padding:0 20px; border:0; border-radius:11px;
+          background:var(--azul); color:#fff; cursor:pointer;
+          box-shadow:0 2px 6px rgba(20,120,208,.32);
+          transition:background .12s ease, transform .06s ease; }
+  .pessoa:hover .acao { background:var(--azul-escuro); }
+  .acao:active { transform:scale(.97); }
+
+  /* Feito não é botão: vira texto. Sem fundo, sem sombra, sem
+     cursor de mão — nada nele convida a apertar de novo. */
+  .acao.feito { background:none; box-shadow:none; color:var(--verde);
+                padding:0 4px; font-weight:600; cursor:default; }
+  .pessoa:hover .acao.feito { background:none; }
+
+  /* Em tela estreita o botão perde a palavra e fica o ✓, que
+     continua sendo obviamente um botão pelo fundo azul. */
+  @media (max-width:560px) {
+    .acao { padding:0 14px; }
+    .acao .rotulo { display:none; }
+    .acao.feito { padding:0; }
+  }
+
+  /* A tarja de quem não tem crachá da gráfica. Com o botão de
+     imprimir fora da lista, é ela que diz à mesa para abrir a
+     ficha e imprimir antes de liberar a pessoa. */
+  .sem-cracha { display:inline-block; margin-top:5px; padding:2px 9px; border-radius:999px;
+                background:#fff4d6; color:#8a5a00; font-size:11.5px; font-weight:700;
+                text-transform:uppercase; letter-spacing:.04em; }
+
+  .vazio { text-align:center; color:var(--cinza); padding:28px 12px; }
+
+  /* Cabeçalho da palestra em conferência. Grudado no topo ao
+     rolar: com a lista longa, quem está na porta precisa continuar
+     vendo de qual sala é a lista, e ter o caminho de volta à mão. */
+  .pal-cabeca { position:sticky; top:0; z-index:2;
+                display:flex; align-items:center; justify-content:space-between;
+                gap:12px; flex-wrap:wrap;
+                background:var(--fundo); border-bottom:2px solid var(--texto);
+                padding:12px 2px 10px; margin-bottom:4px; }
+  .pal-cabeca b { font-size:15px; line-height:1.3; flex:1; min-width:0; }
+  .pal-cabeca button { padding:8px 12px; font-size:13px; flex:none; }
+
+  .pal-pergunta { font-size:15px; color:var(--cinza); margin:6px 2px 14px; }
+
+  /* Alvo grande: a escolha é feita com o celular na mão, em pé. */
+  .pal-escolha { display:flex; flex-direction:column; gap:4px; width:100%;
+                 text-align:left; background:#fff; color:var(--texto);
+                 border:1px solid var(--linha); border-left:5px solid var(--texto);
+                 border-radius:12px; padding:18px 18px; margin-bottom:12px;
+                 font:inherit; cursor:pointer; }
+  .pal-escolha b { font-size:16.5px; line-height:1.25; }
+  .pal-escolha span { font-size:13.5px; color:var(--cinza); }
+  .pal-escolha .conta { font-weight:600; color:var(--texto);
+                        font-variant-numeric:tabular-nums; margin-top:4px; }
+
+  /* ---- confirmação ---- */
+  .veu { position:fixed; inset:0; background:rgba(32,30,29,.55); display:grid;
+         place-items:center; padding:20px; z-index:50; }
+  .caixa-conf { background:#fff; border-radius:16px; padding:22px; max-width:420px; width:100%;
+                box-shadow:0 20px 60px rgba(0,0,0,.3); }
+  .aviso-conf { margin:10px 0 0; font-size:13.5px; color:var(--vermelho); }
+  .aviso-conf:empty { display:none; }
+
+  /* O inscrito é a mesma linha dos responsáveis, um pouco maior:
+     é o nome que se confere primeiro. */
+  .acomp.principal .quem b { font-size:17px; }
+  .acomp.principal .caixa { width:30px; height:30px; font-size:18px; }
+
+  /* Quem a mesa procurou na lista. A ficha mostra a família toda,
+     e sem esta marca fica um instante de dúvida sobre qual dos
+     nomes era o da pessoa parada na frente. */
+  .acomp.clicado { box-shadow:inset 4px 0 0 var(--azul); }
+  .acomp.clicado.presente { box-shadow:inset 4px 0 0 var(--verde); }
+
+  .titulo-acomp { margin:20px 0 8px; font-size:12px; text-transform:uppercase;
+                  letter-spacing:.08em; color:var(--cinza); font-weight:600; }
+
+  /* Cada responsável é uma linha inteira clicável, do mesmo
+     tamanho das linhas da lista: quem credencia está com o dedo
+     apressado e não deve precisar mirar numa caixinha. */
+  /* A linha inteira é o botão: um alvo só, sem nada disputando o
+     toque. align-items:center mantém a caixinha no meio do bloco
+     de texto mesmo quando o nome ocupa duas linhas. */
+  .acomp { display:flex; align-items:center; gap:12px; width:100%;
+           background:#fff; border:1px solid var(--linha); border-radius:10px;
+           padding:12px; margin-bottom:8px; text-align:left; min-height:60px; }
+  .acomp.presente { border-color:#bfe3cf; background:#f4fbf7; }
+
+  /* O ✓ é branco. Sem pintar a caixa de verde aqui, ele fica
+     branco no branco e a linha marcada parece desmarcada — só a
+     borda mudava de cor. A regra da lista (.pessoa.presente) não
+     alcança a ficha. */
+  .acomp.presente .caixa { background:var(--verde); border-color:var(--verde); }
+
+  .acomp .caixa { width:26px; height:26px; font-size:15px; }
+  .acomp .quem { flex:1; min-width:0; }
+  .acomp .quem b { display:block; font-size:15px; font-weight:600; line-height:1.3;
+                   overflow-wrap:anywhere; }
+  .acomp .quem span { display:block; font-size:12.5px; color:var(--cinza); line-height:1.35; }
+
+  /* ---- as duas colunas ----
+
+     Empilhado no celular, lado a lado a partir de 860px. O ponto
+     de corte é onde a coluna do cadastro ainda cabe com 320px sem
+     espremer a lista — abaixo disso, dois campos por linha
+     começariam a quebrar nome de aluno no meio.
+
+     align-items:start impede que a coluna do cadastro estique até
+     a altura da lista, que tem 15 linhas. */
+  .colunas { display:grid; gap:16px; }
+
+  @media (min-width:860px) {
+    .env { max-width:1180px; }
+    /* minmax(0,1fr) e não 1fr: `1fr` é minmax(auto,1fr), e esse
+       `auto` vale o conteúdo MÍNIMO da coluna. Um nome longo com o
+       botão Imprimir ao lado empurra a coluna além da tela, e a
+       página inteira ganha rolagem horizontal — foi o que
+       apareceu no primeiro teste em computador. O zero libera a
+       coluna para encolher. */
+    .colunas { grid-template-columns:minmax(0,1fr) 320px; align-items:start; }
+    /* A coluna do cadastro acompanha a rolagem: com a lista longa,
+       quem está no fim dela não precisa voltar ao topo para
+       cadastrar quem chegou sem inscrição. */
+    .coluna-novo { position:sticky; top:16px; }
+  }
+
+  /* ---- cadastro no dia ---- */
+  details.novo { background:#fff; border:1px solid var(--linha); border-radius:12px;
+                 padding:14px 16px; margin-top:0; }
+  details.novo summary { cursor:pointer; font-weight:600; }
+  .form { display:grid; gap:12px; margin-top:14px; }
+  .form label { font-size:13px; color:var(--cinza); display:block; }
+  .form label input, .form label select { margin-top:5px; }
+
+  /* ============================================================
+     A FOLHA IMPRESSA
+
+     Fica na página o tempo todo, escondida, e só aparece dentro
+     do @media print. Popup foi descartado: navegador de tablet
+     bloqueia window.open sem avisar, e descobrir isso com fila
+     na frente é o pior momento possível.
+     ============================================================ */
+  #folha { display:none; }
+
+  @media print {
+    /* Some com a tela e deixa só a folha. */
+    body > *:not(#folha) { display:none !important; }
+    #folha { display:block !important; }
+
+    @page { size:A4; margin:14mm; }
+    html, body { background:#fff; }
+  }
+
+  #folha .cartao-impresso {
+    text-align:center; padding-top:14mm;
+    font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  #folha .evento { font-size:11pt; letter-spacing:.18em; text-transform:uppercase; color:#605d5d;
+                   margin:0 0 10mm; }
+  #folha .nome { font-size:34pt; font-weight:700; line-height:1.1; margin:0 0 4mm;
+                 letter-spacing:-.02em; overflow-wrap:anywhere; }
+  #folha .sub { font-size:14pt; color:#3d3a39; margin:0 0 12mm; }
+  #folha .qr { width:105mm; height:105mm; margin:0 auto; }
+  #folha .qr svg { width:100%; height:100%; }
+  #folha .codigo { margin:10mm 0 0; font-size:20pt; font-weight:700; letter-spacing:.24em;
+                   font-family:ui-monospace, "Cascadia Mono", Consolas, monospace; }
+  #folha .rotulo { font-size:9pt; letter-spacing:.18em; text-transform:uppercase; color:#605d5d;
+                   margin:0 0 2mm; }
+  #folha .nota { margin:14mm auto 0; max-width:150mm; font-size:10pt; color:#605d5d;
+                 line-height:1.5; }
+
+</style>
+</head>
+<body>
+
+<div class="faixa"></div>
+
+<div class="env">
+
+  <header>
+    <div class="esq">
+      <img src="logo-email.png" alt="Alfacem Global Academy">
+      <span class="risco" aria-hidden="true"></span>
+      <div>
+        <p class="marca">Alfa University Fair</p>
+        <h1>Credenciamento</h1>
+      </div>
+    </div>
+    <a href="evento.html">Ao vivo →</a>
+  </header>
+
+  <!-- ---- acesso ---- -->
+  <div class="acesso" id="deslogado">
+    <p class="msg" style="margin:0">Entre com o e-mail cadastrado. Chega um código de 8 dígitos por e-mail.</p>
+    <div id="passo-email">
+      <div class="linha">
+        <input type="email" id="email" placeholder="voce@exemplo.edu.br"
+               autocomplete="email" autocapitalize="none" spellcheck="false">
+        <button type="button" class="primario" id="btn-codigo">Enviar</button>
+      </div>
+    </div>
+    <div id="passo-codigo" class="oculto">
+      <div class="linha">
+        <input type="text" id="codigo" inputmode="numeric" maxlength="12" placeholder="00000000"
+               autocomplete="one-time-code">
+        <button type="button" class="primario" id="btn-entrar">Entrar</button>
+      </div>
+    </div>
+    <p class="msg" id="aviso"></p>
+  </div>
+
+  <div id="logado" class="oculto">
+
+    <!-- Duas filas diferentes, com kits e crachás diferentes. A
+         aba separa o trabalho em vez de misturar 800 famílias com
+         45 representantes numa busca só. -->
+    <div class="abas" id="abas">
+      <button type="button" data-aba="publico" aria-pressed="true">Alunos e responsáveis</button>
+      <button type="button" data-aba="reps" aria-pressed="false">Representantes</button>
+      <!-- Só aparece para quem a função do banco aceitar. A tela
+           pergunta uma vez, no carregamento, e revela se der certo. -->
+      <button type="button" data-aba="palestras" id="aba-palestras" aria-pressed="false" class="oculto">Palestras</button>
+    </div>
+
+    <div class="placar" id="placar">carregando a lista…</div>
+
+    <div class="colunas">
+     <div class="coluna-lista">
+      <div class="busca">
+        <input type="search" id="q" placeholder="Buscar por nome" autocomplete="off">
+        <label><input type="checkbox" id="so-faltam" style="width:auto"> só quem falta</label>
+        <button type="button" class="primario" id="btn-ler">Ler crachá</button>
+        <button type="button" class="secundario" id="recarregar">Atualizar</button>
+      </div>
+
+      <!-- O leitor marca presença direto: apontou, bipou, entrou.
+           A busca por nome continua logo abaixo para quem chegou
+           sem o crachá. -->
+      <div class="leitor-caixa oculto" id="painel-scan">
+        <div id="leitor-cred"></div>
+        <div class="scan-resultado oculto" id="scan-resultado"></div>
+        <div class="acoes">
+          <button type="button" class="secundario" id="btn-fechar-leitor">Fechar câmera</button>
+        </div>
+      </div>
+
+      <div id="lista"></div>
+     </div>
+
+     <div class="coluna-novo">
+      <details class="novo" id="novo">
+      <summary>Não está na lista? Cadastrar agora</summary>
+      <div class="form">
+        <label>Nome completo *
+          <input type="text" id="n-nome" autocomplete="off"></label>
+        <label>Perfil
+          <select id="n-tipo">
+            <option value="aluno">Aluno</option>
+            <option value="docente">Docente da Rede</option>
+            <option value="counselor">College Counselor externo</option>
+          </select></label>
+        <label>Unidade ou colégio
+          <input type="text" id="n-onde" autocomplete="off"></label>
+        <label>Ano de escolaridade
+          <input type="text" id="n-ano" placeholder="só para aluno" autocomplete="off"></label>
+        <label>Responsável presente
+          <input type="text" id="n-resp" placeholder="quem acompanha o aluno" autocomplete="off"></label>
+        <label>Telefone do responsável
+          <input type="tel" id="n-tel" autocomplete="off"></label>
+        <button type="button" class="primario" id="n-salvar">Cadastrar, marcar presente e imprimir</button>
+        <p class="msg" id="n-aviso"></p>
+      </div>
+      </details>
+     </div>
+    </div>
+
+    <p class="msg" style="margin-top:24px">
+      <span id="quem-texto"></span> ·
+      <a href="#" id="sair">sair</a>
+    </p>
+  </div>
+</div>
+
+<!-- ---- confirmação de presença ---- -->
+<div class="veu oculto" id="veu">
+  <div class="caixa-conf">
+    <p class="msg" style="margin:0">Confira os nomes e marque as caixinhas de quem chegou.</p>
+    <p class="aviso-conf" id="conf-erro"></p>
+
+    <!-- Os dois rótulos são preenchidos pelo JS: quem foi clicado
+         vem sempre primeiro, e o título depende de ser o inscrito
+         ou um responsável. -->
+    <p class="titulo-acomp" id="conf-rotulo-1">Inscrito</p>
+    <div id="conf-principal"></div>
+
+    <div id="conf-acomp" class="oculto">
+      <p class="titulo-acomp" id="conf-rotulo-2">Responsáveis</p>
+      <div id="conf-acomp-lista"></div>
+    </div>
+
+    <button type="button" class="secundario" id="conf-fechar"
+            style="width:100%;margin-top:16px;min-height:52px">Concluir</button>
+  </div>
+</div>
+
+<!-- ---- a folha que sai na impressora: o crachá avulso ---- -->
+<div id="folha">
+  <div class="cartao-impresso" id="folha-cracha">
+    <p class="evento">Alfa University Fair</p>
+    <p class="nome" id="f-nome"></p>
+    <p class="sub" id="f-sub"></p>
+    <div class="qr" id="f-qr"></div>
+    <p class="rotulo">Código</p>
+    <p class="codigo" id="f-codigo"></p>
+    <p class="nota">Mostre este QR aos representantes das universidades para que eles
+      guardem o seu contato. Escreva seu nome na credencial em branco e use-a durante o evento.</p>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL      = window.CONFIG.SUPABASE_URL;
+const SUPABASE_ANON_KEY = window.CONFIG.SUPABASE_ANON_KEY;
+
+/* A URL do app do avaliador. É ela que vai dentro do QR, e
+   precisa ser IDÊNTICA à usada em gerar-crachas.mjs — um crachá
+   impresso no balcão apontando para outro domínio não abre
+   perfil nenhum. */
+const URL_APP = 'https://fair.alfacem-global-academy.workers.dev';
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+});
+
+const $ = s => document.querySelector(s);
+const esc = t => String(t == null ? '' : t)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const mostrar = (el, ver) => el.classList.toggle('oculto', !ver);
+const semAcento = t => String(t || '').toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
+
+/* ============================================================
+   ACESSO — mesmo login do painel: e-mail + código de 6 dígitos.
+   ============================================================ */
+function avisar(txt, erro) {
+  $('#aviso').textContent = txt || '';
+  $('#aviso').className = 'msg' + (erro ? ' erro' : '');
+}
+
+/* O Supabase responde em inglês, e "Signups not allowed for otp"
+   não diz a ninguém que o problema é uma letra errada no endereço.
+   Traduzido para o que a pessoa pode fazer a respeito. */
+function erroDeLogin(e) {
+  const m = (e && e.message) || String(e);
+  return /Signups not allowed|signup_disabled/i.test(m)
+      ? 'E-mail não cadastrado. Confira se digitou o endereço completo.'
+    : /expired|invalid/i.test(m)
+      ? 'Código inválido ou expirado. Toque em Enviar para receber um novo — ' +
+        'e use o último que chegar, porque pedir um código novo cancela o anterior.'
+    : /rate limit|too many|429/i.test(m)
+      ? 'Muitos pedidos de código seguidos. Aguarde alguns minutos.'
+    : /Failed to fetch|NetworkError/i.test(m)
+      ? 'Sem conexão. Confira o wi-fi e tente de novo.'
+      : m;
+}
+
+$('#btn-codigo').addEventListener('click', async function () {
+  const email = $('#email').value.trim().toLowerCase();
+  if (!email) return avisar('Digite o e-mail.', true);
+  this.disabled = true;
+  avisar('Enviando…');
+  const { error } = await sb.auth.signInWithOtp({
+    email, options: { shouldCreateUser: false }
+  });
+  this.disabled = false;
+  if (error) return avisar(erroDeLogin(error), true);
+  mostrar($('#passo-email'), false);
+  mostrar($('#passo-codigo'), true);
+  avisar('Código enviado. Confira o e-mail — e o spam.');
+  $('#codigo').focus();
+});
+
+$('#btn-entrar').addEventListener('click', async function () {
+  const email = $('#email').value.trim().toLowerCase();
+
+  /* Só dígitos: o código chega por e-mail e no celular vai por
+     cópia e cola, que traz espaço, quebra de linha e às vezes um
+     pedaço do texto em volta. Exigir exatamente 6 evita a tentativa
+     que já nasce errada — e queimar o código numa tentativa dessas
+     obriga a pedir outro. */
+  const token = $('#codigo').value.replace(/\D/g, '');
+  if (token.length < 6) {
+    return avisar('Código incompleto. Confira o que chegou por e-mail.', true);
+  }
+
+  this.disabled = true;
+  avisar('Entrando…');
+  const { error } = await sb.auth.verifyOtp({ email, token, type: 'email' });
+  this.disabled = false;
+
+  if (error) return avisar(erroDeLogin(error), true);
+
+  avisar('');
+  iniciar();
+});
+
+$('#sair').addEventListener('click', async e => {
+  e.preventDefault();
+  await sb.auth.signOut();
+  location.reload();
+});
+
+/* ============================================================
+   AS DUAS ABAS
+
+   `aba` decide o que a busca filtra, o que o placar conta e o que
+   a ficha abre. Tudo o mais é compartilhado: a mesa alterna entre
+   as duas filas o dia inteiro e não deve reaprender a tela.
+   ============================================================ */
+let aba = 'publico';
+let REPS = [];
+
+$('#abas').querySelectorAll('[data-aba]').forEach(b => {
+  b.addEventListener('click', () => {
+    aba = b.dataset.aba;
+    $('#abas').querySelectorAll('[data-aba]').forEach(x => {
+      x.setAttribute('aria-pressed', String(x === b));
+    });
+    /* O cadastro no local é do público; representante não se
+       inscreve no balcão, ele já veio convidado, e na palestra a
+       vaga é reservada antes. O leitor de crachá idem: só o
+       público chega com QR de aluno na mão. */
+    mostrar($('.coluna-novo'), aba === 'publico');
+    mostrar($('#btn-ler'), aba === 'publico');
+    if (aba !== 'publico') fecharLeitor();
+    $('#q').placeholder =
+        aba === 'publico' ? 'Buscar por nome'
+      : aba === 'reps'    ? 'Buscar por nome ou instituição'
+      : 'Buscar quem está na palestra';
+    if (aba === 'reps' && !REPS.length) carregarReps();
+    else if (aba === 'palestras' && !PALESTRAS.length) carregarPalestras();
+    else desenhar();
+  });
+});
+
+async function carregarReps(silencioso) {
+  try {
+    const { data, error } = await sb.rpc('lista_avaliadores');
+    if (error) throw error;
+    /* `kind` faz o representante andar pelos mesmos caminhos do
+       resto da tela — ficha, marcação, redesenho — sem um `if`
+       em cada função. */
+    REPS = (data.pessoas || []).map(p => ({ ...p, kind: 'avaliador' }));
+    desenhar();
+  } catch (e) {
+    const m = e && e.message ? e.message : String(e);
+    if (silencioso) return;
+    $('#lista').innerHTML = '<p class="vazio">' +
+      (/lista_avaliadores|PGRST202|schema cache/.test(m)
+        ? 'O banco ainda não tem o credenciamento de representantes.<br>' +
+          'Rode a migration 0040_credenciar_avaliadores.sql.'
+        : 'Não consegui carregar: ' + esc(m)) + '</p>';
+    $('#placar').textContent = '';
+  }
+}
+
+/* ============================================================
+   LEITOR DE CRACHÁ — presença em uma leitura
+
+   Mesmo decodificador do app do avaliador (html5-qrcode em wasm,
+   BarcodeDetector desligado porque falha no Safari iOS). A
+   diferença é o destino: aqui a leitura chama
+   credenciar_por_cracha, que acha E marca numa viagem só.
+
+   "Já estava presente" ganha cor própria (âmbar), porque tem dois
+   significados possíveis: o crachá passou duas vezes — inofensivo
+   — ou há dois papéis com o mesmo QR — e aí a mesa precisa olhar
+   para a pessoa, não para a tela. A função não sobrescreve o
+   horário original de propósito.
+   ============================================================ */
+let leitorQr = null;
+let audioCtx = null;
+let ultimaLeitura = { codigo: null, em: 0 };
+
+function bipar(grave) {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const vol = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = grave ? 330 : 880;
+    vol.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+    vol.gain.exponentialRampToValueAtTime(0.25, audioCtx.currentTime + 0.01);
+    vol.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.14);
+    osc.connect(vol); vol.connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.15);
+  } catch (e) { /* som é acessório */ }
+}
+
+function vibrar(padrao) {
+  try { if (navigator.vibrate) navigator.vibrate(padrao); } catch (e) {}
+}
+
+/* O QR guarda https://<app>/#/p/<token>; aceita também o token
+   cru e o código curto de 6 letras. */
+function extrairCodigo(bruto) {
+  const t = String(bruto || '').trim();
+  const m = t.match(/\/p\/([A-Za-z0-9_-]+)/);
+  if (m) return m[1];
+  const ultimo = t.match(/([A-Za-z0-9_-]{6,})\s*$/);
+  return ultimo ? ultimo[1] : t;
+}
+
+$('#btn-ler').addEventListener('click', () => {
+  const painel = $('#painel-scan');
+  if (painel.classList.contains('oculto')) abrirLeitor();
+  else fecharLeitor();
+});
+$('#btn-fechar-leitor').addEventListener('click', fecharLeitor);
+
+async function abrirLeitor() {
+  mostrar($('#painel-scan'), true);
+  bipar(); // desbloqueia o AudioContext no gesto do usuário
+  if (leitorQr) return;
+  try {
+    leitorQr = new Html5Qrcode('leitor-cred', {
+      verbose: false,
+      experimentalFeatures: { useBarCodeDetectorIfSupported: false }
+    });
+    await leitorQr.start(
+      { facingMode: 'environment' },
+      {
+        fps: 10,
+        qrbox: (larg, alt) => {
+          const lado = Math.floor(Math.min(larg, alt) * 0.72);
+          return { width: lado, height: lado };
+        }
+      },
+      aoLerCracha,
+      () => { /* frame sem QR: silencioso */ }
+    );
+  } catch (e) {
+    leitorQr = null;
+    resultadoScan('erro', 'Câmera indisponível',
+      'Use a busca por nome logo abaixo, ou digite o código do crachá no campo de busca.');
+  }
+}
+
+async function fecharLeitor() {
+  mostrar($('#painel-scan'), false);
+  if (!leitorQr) return;
+  try { await leitorQr.stop(); } catch (e) {}
+  try { leitorQr.clear(); } catch (e) {}
+  leitorQr = null;
+}
+
+function aoLerCracha(texto) {
+  const codigo = extrairCodigo(texto);
+  const agora = Date.now();
+  // O mesmo crachá parado na frente da câmera não repete a chamada.
+  if (ultimaLeitura.codigo === codigo && agora - ultimaLeitura.em < 3000) return;
+  ultimaLeitura = { codigo, em: agora };
+  credenciarPorCracha(codigo);
+}
+
+async function credenciarPorCracha(codigo) {
+  try {
+    const { data, error } = await sb.rpc('credenciar_por_cracha', { p_codigo: codigo });
+    if (error) throw error;
+
+    const hora = data.presente_em
+      ? new Date(data.presente_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+      : '';
+
+    if (data.ja_estava) {
+      bipar(true);
+      vibrar([80, 60, 80]);
+      resultadoScan('atencao', data.nome,
+        'JÁ ESTAVA PRESENTE desde ' + hora + ' — confira se não há dois crachás iguais.',
+        data.detalhe);
+    } else {
+      bipar();
+      vibrar(60);
+      resultadoScan('ok', data.nome, 'Presença registrada às ' + hora + '.', data.detalhe);
+    }
+
+    /* A lista em memória acompanha, sem esperar os 45 s da busca
+       automática: o placar e o "só quem falta" mudam na hora. */
+    const p = PESSOAS.find(x => x.kind === 'inscrito' && x.id === data.id);
+    if (p && !p.presente) { p.presente = true; desenhar(); }
+  } catch (e) {
+    const m = (e && e.message) || String(e);
+    bipar(true);
+    vibrar([80, 60, 80]);
+    resultadoScan('erro', 'Crachá não reconhecido',
+      /cracha_nao_encontrado/.test(m)
+        ? 'Este QR não está na lista. Tente a busca por nome.'
+        : /credenciar_por_cracha|PGRST202|schema cache/.test(m)
+        ? 'O banco ainda não tem a presença por QR. Rode a migration 0055_presenca_por_qr.sql.'
+        : /sem_permissao/.test(m)
+        ? 'Seu usuário não tem acesso ao credenciamento.'
+        : 'Não consegui registrar: ' + m);
+  }
+}
+
+function resultadoScan(tipo, titulo, status, detalhe) {
+  const el = $('#scan-resultado');
+  el.className = 'scan-resultado ' + tipo;
+  el.innerHTML = '<b>' + esc(titulo) + '</b>'
+    + (detalhe ? '<span>' + esc(detalhe) + '</span>' : '')
+    + '<p class="status" style="margin:6px 0 0">' + esc(status) + '</p>';
+}
+
+/* ============================================================
+   LISTA DE PRESENÇA
+
+   Carregada uma vez e filtrada aqui dentro. No dia, a internet do
+   salão disputa com 200 celulares: lista em memória continua
+   respondendo, busca que consulta a cada tecla, não.
+   ============================================================ */
+let PESSOAS = [];
+let ACOMP = {};      // responsáveis por id do aluno
+let INSCRITO = {};   // inscrito por id, para achar a família pelo responsável
+
+async function carregarLista(silencioso) {
+  if (!silencioso) $('#placar').textContent = 'carregando a lista…';
+  try {
+    const { data, error } = await sb.rpc('lista_presenca');
+    if (error) throw error;
+    PESSOAS = data.pessoas || [];
+    agrupar();
+    desenhar();
+  } catch (e) {
+    /* Falha na busca automática não estraga a tela: a lista que
+       está na memória continua servindo, e a mesa segue
+       trabalhando. Só a busca pedida por alguém avisa. */
+    if (!silencioso) $('#placar').textContent = 'Não consegui carregar: ' + (e.message || e);
+  }
+}
+
+/* ---- busca automática ----
+
+   Quem é cadastrado em outro aparelho entra no banco, não nesta
+   tela: a lista foi carregada antes de a pessoa existir. Com duas
+   mesas trabalhando, ninguém vai lembrar de apertar Atualizar com
+   fila na frente.
+
+   45 segundos é curto o bastante para a pessoa já estar na lista
+   quando chegar, e espaçado o bastante para não competir com a
+   internet do salão — é uma chamada por minuto, não por tecla.
+
+   As três guardas importam mais que o intervalo:
+   - ficha aberta: recarregar troca os objetos por baixo do que
+     está na tela, e a marcação seguinte iria para o objeto velho
+   - aba escondida: tablet no bolso não precisa consultar nada
+   - sem lista ainda: ninguém logou */
+setInterval(() => {
+  if (alvo || document.hidden) return;
+  /* Quem só tem as palestras nunca carrega PESSOAS — para essa
+     conta a guarda de "sem lista ainda" seria a de nunca atualizar. */
+  if (PALESTRAS.length) carregarPalestras(true);
+  if (!PESSOAS.length) return;
+  carregarLista(true);
+  if (REPS.length) carregarReps(true);
+}, 45000);
+
+/* Dois índices, montados uma vez a cada carga e não a cada tecla:
+   os responsáveis de cada aluno, e o aluno de cada id. O segundo
+   é o que permite abrir a família a partir do responsável — ele
+   guarda `de`, o id do aluno (migration 0031). */
+function agrupar() {
+  ACOMP = {};
+  INSCRITO = {};
+  for (const p of PESSOAS) {
+    if (p.kind === 'inscrito') INSCRITO[p.id] = p;
+  }
+  for (const p of PESSOAS) {
+    if (p.kind !== 'acompanhante' || !p.de) continue;
+    (ACOMP[p.de] = ACOMP[p.de] || []).push(p);
+  }
+}
+
+/* A família de qualquer pessoa — clicando no aluno ou no
+   responsável, chega-se ao mesmo conjunto. É isso que faz a ficha
+   mostrar "o aluno já está presente" para quem chega depois. */
+function familiaDe(p) {
+  const idAluno = p.kind === 'acompanhante' ? p.de : p.id;
+  return { aluno: INSCRITO[idAluno] || null, acomp: ACOMP[idAluno] || [] };
+}
+
+function desenhar() {
+  if (aba === 'reps') return desenharReps();
+  if (aba === 'palestras') return desenharPalestras();
+
+  const termo = semAcento($('#q').value.trim());
+  const soFaltam = $('#so-faltam').checked;
+
+  /* O placar conta TODO MUNDO — aluno e responsável — porque é o
+     número de gente dentro do salão, que é o que a organização
+     precisa saber. Já a lista mostra só quem tem inscrição
+     própria: os responsáveis aparecem dentro da ficha de cada um.
+     São coisas diferentes de propósito. */
+  const presentes = PESSOAS.filter(p => p.presente).length;
+  const pct = PESSOAS.length ? (presentes / PESSOAS.length * 100) : 0;
+  $('#placar').innerHTML =
+    '<div class="numeros">' +
+      '<span class="grande">' + presentes + '</span>' +
+      '<span class="de">de <b>' + PESSOAS.length + '</b> credenciados</span>' +
+      '<span class="faltam">' + (PESSOAS.length - presentes) + ' ainda não chegaram</span>' +
+    '</div>' +
+    '<div class="barra"><span style="width:' + pct.toFixed(1) + '%"></span></div>';
+
+  /* TODO MUNDO na lista — aluno e responsável, cada um com a sua
+     linha. A família chega junta às vezes, separada em outras: o
+     responsável que vem sozinho meia hora depois precisa ser
+     encontrado pelo nome dele, não pelo do filho.
+
+     A ficha é que reúne os dois, aberta a partir de qualquer um. */
+  const vis = PESSOAS.filter(p =>
+    (!soFaltam || !p.presente) && (!termo || semAcento(p.nome).includes(termo)));
+
+  if (!vis.length) {
+    /* O caso mais provável de "não achei" no dia é um cadastro
+       feito há pouco em outro aparelho. A tela busca sozinha a
+       cada 45s, mas quem está com a pessoa na frente não espera —
+       o botão fica à mão. */
+    $('#lista').innerHTML = '<p class="vazio">Ninguém com esse nome.<br>' +
+      'Se a pessoa foi cadastrada agora há pouco, toque em ' +
+      '<b>Atualizar</b> ali em cima — ou cadastre ao lado.</p>';
+    return;
+  }
+
+  /* Teto de linhas: redesenhar 1500 a cada tecla trava o aparelho.
+     Em tela grande cabe mais sem custo, e a mesa costuma trabalhar
+     com o computador — ver de relance quem está por chegar vale
+     mais ali do que num celular. */
+  const largo = window.innerWidth >= 860;
+  const teto = termo ? (largo ? 80 : 40) : (largo ? 30 : 15);
+  const parte = vis.slice(0, teto);
+
+  $('#lista').innerHTML = parte.map(p => {
+    /* No aluno, quantos responsáveis já chegaram. No responsável,
+       se o aluno dele já está presente — que é a pergunta que a
+       mesa faz quando ele aparece sozinho. */
+    const fam = familiaDe(p);
+    let selo = '';
+    if (p.kind === 'inscrito' && fam.acomp.length) {
+      const vieram = fam.acomp.filter(c => c.presente).length;
+      selo = ` · ${vieram}/${fam.acomp.length} responsáve${fam.acomp.length > 1 ? 'is' : 'l'}`;
+    } else if (p.kind === 'acompanhante' && fam.aluno) {
+      selo = fam.aluno.presente ? ' · inscrito já presente' : ' · inscrito ainda não chegou';
+    }
+    /* Sem crachá da gráfica: quem se inscreveu pelo QR do cartaz,
+       quem foi digitado no balcão, e quem foi aprovado depois da
+       última leva. Muda o que a mesa faz — precisa imprimir a
+       folha antes de liberar a pessoa. */
+    const bandeira = p.sem_cracha
+      ? `<span class="sem-cracha">${p.origem === 'feira' ? 'inscrito no local' : 'sem crachá'} · imprimir</span>`
+      : '';
+    return `
+    <div class="pessoa${p.presente ? ' presente' : ''}">
+      <div class="caixa">${p.presente ? '✓' : ''}</div>
+      <div class="quem">
+        <b>${esc(p.nome)}</b>
+        <span>${esc(p.detalhe || '')}${p.codigo ? ' · ' + esc(p.codigo) : ''}${selo}</span>
+        ${bandeira}
+      </div>
+      ${p.presente
+        ? '<span class="acao feito">✓ <span class="rotulo">Presente</span></span>'
+        : '<button type="button" class="acao">✓ <span class="rotulo">Marcar presença</span></button>'}
+    </div>`; }).join('')
+    + (vis.length > parte.length
+        ? '<p class="vazio">+ ' + (vis.length - parte.length) +
+          (termo ? ' com esse nome — seja mais específico.' : ' na lista — busque pelo nome.') + '</p>'
+        : '');
+
+  /* A linha inteira abre a ficha — nada mais compete pelo toque.
+     A impressão mudou de lugar: fica dentro da ficha, junto do
+     nome que se está conferindo. Na lista ela roubava largura de
+     todas as linhas para servir a poucas. */
+  $('#lista').querySelectorAll('.pessoa').forEach((el, i) => {
+    el.addEventListener('click', () => abrirFicha(parte[i]));
+  });
+}
+
+/* Os representantes são 45, não 800: a lista inteira cabe na tela
+   e não precisa de teto nem de "busque pelo nome". A busca olha
+   também a instituição — na mesa costuma-se dizer "sou da FGV"
+   antes de dizer o próprio nome. */
+function desenharReps() {
+  const termo = semAcento($('#q').value.trim());
+  const soFaltam = $('#so-faltam').checked;
+
+  const presentes = REPS.filter(p => p.presente).length;
+  const pct = REPS.length ? (presentes / REPS.length * 100) : 0;
+  $('#placar').innerHTML =
+    '<div class="numeros">' +
+      '<span class="grande">' + presentes + '</span>' +
+      '<span class="de">de <b>' + REPS.length + '</b> representantes</span>' +
+      '<span class="faltam">' + (REPS.length - presentes) + ' ainda não chegaram</span>' +
+    '</div>' +
+    '<div class="barra"><span style="width:' + pct.toFixed(1) + '%"></span></div>';
+
+  const vis = REPS.filter(p =>
+    (!soFaltam || !p.presente) &&
+    (!termo || semAcento(p.nome).includes(termo) || semAcento(p.onde || '').includes(termo)));
+
+  if (!vis.length) {
+    $('#lista').innerHTML = '<p class="vazio">Nenhum representante com esse nome.</p>';
+    return;
+  }
+
+  $('#lista').innerHTML = vis.map(p => `
+    <div class="pessoa${p.presente ? ' presente' : ''}">
+      <div class="caixa">${p.presente ? '✓' : ''}</div>
+      <div class="quem">
+        <b>${esc(p.nome)}</b>
+        <span>${esc(p.onde || p.email || '')}</span>
+        ${p.presente && p.em
+          ? `<span>credenciado às ${esc(new Date(p.em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))}</span>`
+          : ''}
+      </div>
+      ${p.presente
+        ? '<span class="acao feito">✓ <span class="rotulo">Credenciado</span></span>'
+        : '<button type="button" class="acao">✓ <span class="rotulo">Entregar kit</span></button>'}
+    </div>`).join('');
+
+  $('#lista').querySelectorAll('.pessoa').forEach((el, i) => {
+    el.addEventListener('click', () => abrirFicha(vis[i]));
+  });
+}
+
+/* ============================================================
+   PRESENÇA NAS PALESTRAS (0044)
+
+   Outra lista, outra porta. Quem confere a palestra está na porta
+   da sala, com o celular na mão, e o nome é tudo que precisa ver —
+   a função do banco nem devolve e-mail nem telefone.
+
+   Diferente das outras duas abas, aqui o toque marca direto, sem
+   abrir ficha: não há kit para entregar nem crachá para imprimir,
+   e a fila da porta anda rápido.
+   ============================================================ */
+let PALESTRAS = [];
+
+async function carregarPalestras(silencioso) {
+  try {
+    const { data, error } = await sb.rpc('lista_presenca_palestras');
+    if (error) throw error;
+    PALESTRAS = data.palestras || [];
+    if (aba === 'palestras') desenhar();
+    return true;
+  } catch (e) {
+    if (silencioso) return false;
+    const m = e && e.message ? e.message : String(e);
+    $('#lista').innerHTML = '<p class="vazio">' +
+      (/lista_presenca_palestras|PGRST202|schema cache/.test(m)
+        ? 'O banco ainda não tem a presença das palestras.<br>' +
+          'Rode a migration 0044_presenca_palestras.sql.'
+        : 'Não consegui carregar: ' + esc(m)) + '</p>';
+    $('#placar').textContent = '';
+    return false;
+  }
+}
+
+/* Qual sala está sendo conferida. Null = ainda escolhendo.
+
+   A escolha vem antes da lista de propósito: quem confere está na
+   porta de UMA sala, e ver os dois grupos misturados só cria chance
+   de marcar presente na palestra errada — erro que ninguém percebe
+   depois. */
+let PAL_SEL = null;
+
+function desenharPalestras() {
+  if (!PAL_SEL) return escolherPalestra();
+
+  const pa = PALESTRAS.find(x => x.codigo === PAL_SEL);
+  if (!pa) { PAL_SEL = null; return escolherPalestra(); }
+
+  const pessoas = pa.pessoas || [];
+  const presentes = pessoas.filter(p => p.presente).length;
+  const pct = pessoas.length ? (presentes / pessoas.length * 100) : 0;
+
+  $('#placar').innerHTML =
+    '<div class="numeros">' +
+      '<span class="grande">' + presentes + '</span>' +
+      '<span class="de">de <b>' + pessoas.length + '</b> nesta palestra</span>' +
+      '<span class="faltam">' + (pessoas.length - presentes) + ' ainda não chegaram</span>' +
+    '</div>' +
+    '<div class="barra"><span style="width:' + pct.toFixed(1) + '%"></span></div>';
+
+  const termo = semAcento($('#q').value.trim());
+  const soFaltam = $('#so-faltam').checked;
+  const vis = pessoas.filter(p =>
+    (!soFaltam || !p.presente) && (!termo || semAcento(p.nome).includes(termo)));
+
+  const cabeca = `
+    <div class="pal-cabeca">
+      <b>${esc(pa.titulo)}</b>
+      <button type="button" class="secundario" id="pal-trocar">Trocar palestra</button>
+    </div>`;
+
+  $('#lista').innerHTML = cabeca + (vis.length
+    ? vis.map(p => `
+      <div class="pessoa${p.presente ? ' presente' : ''}" data-pid="${esc(p.id)}">
+        <div class="caixa">${p.presente ? '✓' : ''}</div>
+        <div class="quem"><b>${esc(p.nome)}</b></div>
+        ${p.presente
+          ? '<span class="acao feito">✓ <span class="rotulo">Presente</span></span>'
+          : '<button type="button" class="acao">✓ <span class="rotulo">Marcar</span></button>'}
+      </div>`).join('')
+    : '<p class="vazio">' +
+      (termo ? 'Ninguém com esse nome nesta palestra.'
+             : soFaltam ? 'Todo mundo desta palestra já foi marcado.'
+             : 'Ninguém inscrito nesta palestra.') + '</p>');
+
+  $('#pal-trocar').addEventListener('click', () => {
+    PAL_SEL = null;
+    $('#q').value = '';
+    desenhar();
+  });
+
+  $('#lista').querySelectorAll('.pessoa[data-pid]').forEach(el => {
+    el.addEventListener('click', () => marcarPalestra(pa.codigo, el.dataset.pid));
+  });
+}
+
+/* A tela de escolha. Cada palestra é um alvo grande, com o número
+   de presentes já visível — dá para conferir o andamento das duas
+   sem entrar em nenhuma. */
+function escolherPalestra() {
+  const todos = PALESTRAS.flatMap(p => p.pessoas || []);
+  const presentes = todos.filter(p => p.presente).length;
+
+  $('#placar').innerHTML =
+    '<div class="numeros">' +
+      '<span class="grande">' + presentes + '</span>' +
+      '<span class="de">de <b>' + todos.length + '</b> presentes nas palestras</span>' +
+    '</div>';
+
+  if (!PALESTRAS.length) {
+    $('#lista').innerHTML = '<p class="vazio">Nenhuma palestra ativa.</p>';
+    return;
+  }
+
+  $('#lista').innerHTML =
+    '<p class="pal-pergunta">Qual palestra você vai conferir?</p>' +
+    PALESTRAS.map(pa => {
+      const n = (pa.pessoas || []).length;
+      const p = (pa.pessoas || []).filter(x => x.presente).length;
+      return `
+      <button type="button" class="pal-escolha" data-pal="${esc(pa.codigo)}">
+        <b>${esc(pa.titulo)}</b>
+        ${pa.palestrante ? `<span>${esc(pa.palestrante)}</span>` : ''}
+        <span class="conta">${p} de ${n} presentes</span>
+      </button>`;
+    }).join('');
+
+  $('#lista').querySelectorAll('.pal-escolha').forEach(b => {
+    b.addEventListener('click', () => {
+      PAL_SEL = b.dataset.pal;
+      $('#q').value = '';
+      desenhar();
+    });
+  });
+}
+
+async function marcarPalestra(codigo, id) {
+  const pa = PALESTRAS.find(x => x.codigo === codigo);
+  const pessoa = pa && (pa.pessoas || []).find(p => p.id === id);
+  if (!pessoa) return;
+
+  /* Vira na tela antes de o servidor responder, como as outras
+     abas fazem: no salão a resposta demora, e a fila não espera.
+     Se falhar, volta atrás e diz o nome de quem não salvou. */
+  const virar = !pessoa.presente;
+  pessoa.presente = virar;
+  desenhar();
+
+  try {
+    const { error } = await sb.rpc('marcar_presenca_palestra', {
+      p_id: id, p_presente: virar
+    });
+    if (error) throw error;
+  } catch (e) {
+    pessoa.presente = !virar;
+    desenhar();
+    $('#placar').insertAdjacentHTML('beforeend',
+      '<p class="msg erro">Não salvou ' + esc(pessoa.nome) + ': ' + esc(e.message || e) + '</p>');
+  }
+}
+
+/* ============================================================
+   A FICHA DA FAMÍLIA
+
+   A família chega junta e é credenciada junta. Antes, aluno e
+   responsáveis eram três linhas soltas numa lista de 1500 nomes,
+   e quem credenciava procurava três vezes.
+
+   O popup também é a conferência do nome, que continua
+   necessária: o painel acusa 16 grupos de homônimos neste evento,
+   e marcar na pessoa errada estraga duas linhas — quem chegou
+   fica como ausente e quem não veio consta como presente.
+   ============================================================ */
+let alvo = null;
+
+function abrirFicha(pessoa) {
+  /* `alvo` é quem foi clicado — pode ser o aluno ou o
+     responsável. A ficha sempre mostra a família inteira; o alvo
+     serve para destacar a linha que a mesa procurou. */
+  alvo = pessoa;
+  $('#conf-erro').textContent = '';
+  desenharFicha();
+  mostrar($('#veu'), true);
+}
+
+/* Inscrito e responsáveis desenhados pelo MESMO molde. A ficha
+   inteira vira uma lista de caixinhas com a mesma aparência e o
+   mesmo gesto — quem credencia não precisa aprender dois
+   controles diferentes na mesma tela. */
+function linhaFicha(p, sub, marca, principal, clicado) {
+  return `
+    <button type="button" data-marcar="${marca}"
+            class="acomp${p.presente ? ' presente' : ''}${principal ? ' principal' : ''}${clicado ? ' clicado' : ''}">
+      <span class="caixa">${p.presente ? '✓' : ''}</span>
+      <span class="quem">
+        <b>${esc(p.nome)}</b>
+        <span>${esc(sub)}</span>
+      </span>
+    </button>`;
+}
+
+/* Subtítulo de cada linha: no inscrito, série e código; no
+   responsável, o parentesco. */
+const subDe = p =>
+    p.kind === 'avaliador' ? [p.onde, p.email].filter(Boolean).join(' · ')
+  : p.kind === 'inscrito'  ? (p.detalhe || '') + (p.codigo ? ' · ' + p.codigo : '')
+  : (p.parentesco || 'Responsável');
+
+function desenharFicha() {
+  if (!alvo) return;
+
+  /* Representante vem sozinho: sem família, sem segunda seção. */
+  if (alvo.kind === 'avaliador') {
+    $('#conf-rotulo-1').textContent = 'Representante';
+    $('#conf-principal').innerHTML =
+      linhaFicha(alvo, subDe(alvo), 'principal', true, true);
+    mostrar($('#conf-acomp'), false);
+    $('#conf-principal').querySelectorAll('[data-marcar]').forEach(b => {
+      b.addEventListener('click', () => alternar(alvo));
+    });
+    return;
+  }
+
+  const fam = familiaDe(alvo);
+  const mesmo = p => p && p.kind === alvo.kind && p.id === alvo.id;
+
+  /* QUEM FOI CLICADO VEM PRIMEIRO.
+
+     A ficha mostra a família inteira, mas a pessoa parada na
+     frente da mesa é a que a mesa procurou — e ela precisa ser a
+     primeira linha. Com o inscrito fixo no topo, quem clicava
+     numa responsável lia o nome do filho primeiro e hesitava
+     antes de achar o dela embaixo. */
+  const resto = [];
+  if (fam.aluno && !mesmo(fam.aluno)) resto.push(fam.aluno);
+  for (const c of fam.acomp) if (!mesmo(c)) resto.push(c);
+
+  const ehInscrito = alvo.kind === 'inscrito';
+
+  $('#conf-rotulo-1').textContent = ehInscrito ? 'Inscrito' : 'Responsável';
+  $('#conf-principal').innerHTML =
+    linhaFicha(alvo, subDe(alvo), 'principal', true, true);
+
+  /* O segundo rótulo diz o que sobrou: só responsáveis, quando o
+     inscrito está no topo; o inscrito (e os outros responsáveis)
+     quando quem abriu foi um responsável. */
+  const outrosResp = resto.filter(p => p.kind === 'acompanhante').length;
+  $('#conf-rotulo-2').textContent = ehInscrito
+    ? 'Responsáveis'
+    : (outrosResp ? 'Inscrito e demais responsáveis' : 'Inscrito');
+
+  mostrar($('#conf-acomp'), resto.length > 0);
+  $('#conf-acomp-lista').innerHTML = resto.map((p, i) =>
+    linhaFicha(p, subDe(p), String(i), false, false)).join('');
+
+  const quem = m => (m === 'principal' ? alvo : resto[+m]);
+
+  $('.caixa-conf').querySelectorAll('[data-marcar]').forEach(b => {
+    b.addEventListener('click', () => alternar(quem(b.dataset.marcar)));
+  });
+}
+
+/* Marca ou desmarca uma pessoa — aluno ou responsável, mesmo
+   caminho. Vira na tela antes da resposta do servidor: com a
+   família esperando na frente, o retorno tem que ser imediato. Se
+   falhar, volta e avisa. */
+async function alternar(pessoa) {
+  if (!pessoa) return;
+  const virar = !pessoa.presente;
+  pessoa.presente = virar;
+  $('#conf-erro').textContent = '';
+  desenharFicha();
+  desenhar();
+
+  try {
+    /* Representante tem função própria (0040): a marcar_presenca
+       da 0025 só conhece inscrito e acompanhante, e é usada por
+       duas telas — não valia recriá-la na véspera do evento. */
+    const { error } = pessoa.kind === 'avaliador'
+      ? await sb.rpc('marcar_avaliador', { p_id: pessoa.id, p_presente: virar })
+      : await sb.rpc('marcar_presenca', {
+          p_kind: pessoa.kind, p_id: pessoa.id, p_presente: virar
+        });
+    if (error) throw error;
+    if (pessoa.kind === 'avaliador' && virar) pessoa.em = new Date().toISOString();
+  } catch (e) {
+    pessoa.presente = !virar;
+    desenharFicha();
+    desenhar();
+    $('#conf-erro').textContent = 'Não salvou ' + pessoa.nome + ': ' + (e.message || e);
+  }
+}
+
+function fecharFicha() { alvo = null; mostrar($('#veu'), false); }
+
+$('#conf-fechar').addEventListener('click', fecharFicha);
+$('#veu').addEventListener('click', e => { if (e.target === $('#veu')) fecharFicha(); });
+
+/* ============================================================
+   IMPRESSÃO DO CRACHÁ AVULSO
+
+   O token vem de um em um, no clique — nunca junto da lista.
+   ============================================================ */
+async function imprimirDe(kind, id, botao) {
+  const rotulo = botao ? botao.textContent : '';
+  if (botao) { botao.disabled = true; botao.textContent = '…'; }
+
+  try {
+    const { data, error } = await sb.rpc('cracha_avulso', { p_kind: kind, p_id: id });
+    if (error) throw error;
+    imprimirFolha(data);
+  } catch (e) {
+    const m = e && e.message ? e.message : String(e);
+    alert(/cracha_avulso/.test(m)
+      ? 'O banco ainda não tem a função de crachá avulso.\n' +
+        'Rode a migration 0030_cracha_avulso.sql no SQL Editor.'
+      : 'Não consegui gerar o crachá: ' + m);
+  } finally {
+    if (botao) { botao.disabled = false; botao.textContent = rotulo; }
+  }
+}
+
+function imprimirFolha(d) {
+  $('#folha-cracha').style.display = 'block';
+  $('#f-nome').textContent = d.nome || '';
+  $('#f-sub').textContent = d.sub || '';
+  $('#f-codigo').textContent = d.codigo || '';
+
+  /* Correção de erro nível Q: recupera ~25% do código danificado.
+     Papel comum amassa no bolso, e um QR que só lê liso é um QR
+     que falha na segunda hora de evento. */
+  const qr = qrcode(0, 'Q');
+  qr.addData(URL_APP + '/#/p/' + d.token);
+  qr.make();
+  $('#f-qr').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+
+  /* O timeout dá um quadro ao navegador para desenhar o SVG antes
+     de congelar a página para impressão. Sem ele, sai folha com o
+     espaço do QR em branco em parte dos aparelhos. */
+  setTimeout(() => window.print(), 60);
+}
+
+/* ============================================================
+   CADASTRO NO DIA
+   ============================================================ */
+$('#n-salvar').addEventListener('click', async function () {
+  const nome = $('#n-nome').value.trim();
+  const aviso = $('#n-aviso');
+  if (nome.split(/\s+/).length < 2) {
+    aviso.className = 'msg erro';
+    aviso.textContent = 'Informe o nome completo, com sobrenome.';
+    return;
+  }
+
+  this.disabled = true;
+  aviso.className = 'msg';
+  aviso.textContent = 'Cadastrando…';
+
+  try {
+    const tipo = $('#n-tipo').value;
+    const { data, error } = await sb.rpc('inscrever_no_local', { p_dados: {
+      tipo: tipo,
+      nome: nome,
+      onde: $('#n-onde').value.trim(),
+      ano: $('#n-ano').value.trim(),
+      responsavel_nome: $('#n-resp').value.trim(),
+      responsavel_telefone: $('#n-tel').value.trim(),
+      da_rede: tipo !== 'counselor'
+    }});
+    if (error) throw error;
+
+    aviso.textContent = 'Cadastrado e presente. Código ' + data.codigo + '. Imprimindo…';
+    ['#n-nome', '#n-onde', '#n-ano', '#n-resp', '#n-tel'].forEach(s => { $(s).value = ''; });
+
+    /* A lista é recarregada para a pessoa nova aparecer nela — e
+       para o placar somar. */
+    carregarLista();
+    await imprimirDe('inscrito', data.id, null);
+  } catch (e) {
+    aviso.className = 'msg erro';
+    aviso.textContent = 'Não cadastrou: ' + (e.message || e);
+  } finally {
+    this.disabled = false;
+  }
+});
+
+/* ============================================================
+   ENTRADA
+   ============================================================ */
+$('#q').addEventListener('input', desenhar);
+$('#so-faltam').addEventListener('change', desenhar);
+$('#recarregar').addEventListener('click', carregarLista);
+
+async function iniciar() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) {
+    mostrar($('#deslogado'), true);
+    mostrar($('#logado'), false);
+    return;
+  }
+
+  try {
+    /* lista_presenca() exige gestor. Se recusar, a pessoa está
+       logada mas sem permissão — e precisa saber disso, não ver
+       uma tela vazia. */
+    const { data, error } = await sb.rpc('lista_presenca');
+    if (error) throw error;
+
+    PESSOAS = data.pessoas || [];
+    agrupar();
+    mostrar($('#deslogado'), false);
+    mostrar($('#logado'), true);
+    $('#quem-texto').textContent = session.user.email;
+    desenhar();
+
+    /* Pergunta em silêncio se esta conta também alcança as
+       palestras. Se alcançar, a aba aparece; se não, fica escondida
+       e ninguém clica num botão que responderia `sem_permissao`.
+       Quem decide é o banco, não a tela. */
+    if (await carregarPalestras(true)) mostrar($('#aba-palestras'), true);
+
+  } catch (e) {
+    const m = e && e.message ? e.message : String(e);
+
+    /* A recusa aqui não significa "sem acesso": pode ser a
+       coordenação de bilinguismo, que só tem as palestras. Antes de
+       barrar, tenta a lista dela. */
+    if (/sem_permissao/.test(m) && await carregarPalestras(true)) {
+      soPalestras();
+      mostrar($('#deslogado'), false);
+      mostrar($('#logado'), true);
+      $('#quem-texto').textContent = session.user.email;
+      return;
+    }
+
+    mostrar($('#deslogado'), true);
+    mostrar($('#logado'), false);
+    avisar(/sem_permissao/.test(m)
+      ? 'Sua conta não tem permissão para esta tela. Fale com quem administra.'
+      : 'Não consegui carregar: ' + m, true);
+  }
+}
+
+/* Modo de quem só tem as palestras: some tudo que pertence à mesa
+   de entrada, para a pessoa não esbarrar em botão que não funciona
+   para ela. As funções por trás desses botões recusariam de
+   qualquer jeito — isto é para a tela não mentir. */
+function soPalestras() {
+  aba = 'palestras';
+  $('#abas').querySelectorAll('[data-aba]').forEach(b => {
+    const minha = b.dataset.aba === 'palestras';
+    mostrar(b, minha);
+    b.setAttribute('aria-pressed', String(minha));
+  });
+  mostrar($('.coluna-novo'), false);
+  mostrar($('#btn-ler'), false);
+  $('#q').placeholder = 'Buscar quem está na palestra';
+  desenhar();
+}
+
+iniciar();
+</script>
+</body>
+</html>

@@ -1,0 +1,1217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f3d8a">
+<title>Contact Capture — Representatives</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icone-192.png">
+<link rel="apple-touch-icon" href="icone-192.png">
+
+<!-- URL e chave anon do projeto: copie config.exemplo.js para config.js -->
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+<style>
+  /* Paleta alinhada com o formulário de inscrição: o avaliador vê
+     as duas telas no mesmo dia e elas precisam parecer o mesmo
+     evento. Fonte é a do sistema de propósito — carrega
+     instantâneo e não depende de rede, que é o maior risco do
+     local. */
+  :root {
+    --azul: #1478d0;
+    --azul-escuro: #0f5ca3;
+    --azul-claro: #e7f1fb;
+    --verde: #0a7d4b;
+    --vermelho: #b02020;
+    --ambar: #8a5a00;
+    --ambar-fundo: #fff4d6;
+    --texto: #201e1d;
+    --texto-fraco: #6b6664;
+    --borda: #dcd9d7;
+    --fundo: #f3f2f2;
+    --superficie: #fff;
+    --sombra: 0 1px 2px rgba(32,30,29,.06), 0 4px 16px rgba(32,30,29,.06);
+    --raio: 16px;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--fundo); color: var(--texto);
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overscroll-behavior-y: contain;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* ---------- estrutura de telas ----------
+     100dvh e não 100vh: no iOS a barra de endereço some ao rolar e
+     o vh continua valendo o tamanho antigo, deixando o rodapé fixo
+     escondido atrás dela. */
+  .tela { display: none; flex-direction: column; min-height: 100dvh; }
+  .tela.ativa { display: flex; }
+
+  .cabecalho {
+    display: flex; align-items: center; gap: 8px;
+    padding: max(10px, env(safe-area-inset-top)) 12px 10px;
+    background: var(--azul); color: #fff;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .cabecalho h1 {
+    font-size: 17px; margin: 0; flex: 1; font-weight: 650;
+    text-align: center; letter-spacing: -.01em;
+  }
+
+  .conteudo { flex: 1; padding: 16px; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
+
+  /* ---------- controles ---------- */
+  button, input, textarea, select { font: inherit; }
+
+  /* 56px de altura mínima é o alvo confortável para o polegar de
+     quem está em pé, segurando o celular com uma mão só e um
+     crachá na outra. Vale para botão e campo. */
+  .btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; min-height: 56px; padding: 14px 18px;
+    border: 0; border-radius: 14px; cursor: pointer;
+    font-size: 17px; font-weight: 650; letter-spacing: -.01em;
+    background: var(--azul); color: #fff;
+    box-shadow: 0 2px 8px rgba(20,120,208,.25);
+    transition: transform .06s ease, background .15s ease;
+  }
+  .btn:active { transform: scale(.985); background: var(--azul-escuro); }
+  .btn:disabled { background: #ccc9c7; color: #837e7b; box-shadow: none; cursor: not-allowed; }
+  .btn.secundario { background: var(--superficie); color: var(--azul); border: 1.5px solid var(--borda); box-shadow: none; }
+  .btn.perigo { background: var(--superficie); color: var(--vermelho); border: 1.5px solid var(--borda); box-shadow: none; }
+  .btn.fantasma {
+    background: rgba(255,255,255,.14); color: #fff;
+    border: 1px solid rgba(255,255,255,.25);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    box-shadow: none;
+  }
+  .btn.fantasma:active { background: rgba(255,255,255,.28); }
+  .btn.pequeno { min-height: 44px; font-size: 15px; padding: 8px 14px; width: auto; border-radius: 12px; }
+
+  /* 16px no campo não é escolha estética: abaixo disso o Safari do
+     iPhone dá zoom sozinho ao focar e desalinha a tela inteira. */
+  .campo {
+    width: 100%; min-height: 56px; padding: 15px 16px; font-size: 16px;
+    border: 1.5px solid var(--borda); border-radius: 14px;
+    background: var(--superficie); color: var(--texto);
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  .campo:focus {
+    outline: none; border-color: var(--azul);
+    box-shadow: 0 0 0 4px var(--azul-claro);
+  }
+  .campo::placeholder { color: #a8a3a0; }
+
+  label.rotulo {
+    display: block; font-size: 13px; font-weight: 650;
+    color: var(--texto-fraco); margin: 18px 0 6px;
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+
+  .cartao {
+    background: var(--superficie); border: 1px solid var(--borda);
+    border-radius: var(--raio); padding: 18px; margin-bottom: 12px;
+    box-shadow: var(--sombra);
+  }
+
+  .aviso {
+    padding: 13px 15px; border-radius: 12px; margin-bottom: 14px;
+    font-size: 15px; line-height: 1.35;
+  }
+  .aviso.erro   { background: #fdecea; color: var(--vermelho); }
+  .aviso.ok     { background: #e6f4ec; color: var(--verde); }
+  .aviso.atencao{ background: var(--ambar-fundo); color: var(--ambar); }
+  .aviso:empty  { display: none; }
+
+  .selo { display: inline-block; padding: 4px 11px; border-radius: 999px;
+          font-size: 12px; font-weight: 700; letter-spacing: .02em; }
+  .selo.ok       { background: #e6f4ec; color: var(--verde); }
+  .selo.pendente { background: var(--ambar-fundo); color: var(--ambar); }
+  .selo.bloqueado{ background: #fdecea; color: var(--vermelho); }
+
+  /* ---------- login ---------- */
+  /* A centralização vem do pai (align-items), não do `margin:auto`
+     do filho. Margem automática se resolve contra o bloco
+     contentor, que numa janela com barra de rolagem ou com
+     qualquer transbordo horizontal não é a largura visível — e a
+     coluna nasce alguns pixels à esquerda do centro. O
+     align-items do flex não tem esse problema. */
+  #tela-login.ativa { align-items: center; }
+  #tela-login .conteudo {
+    display: flex; flex-direction: column; justify-content: center;
+    max-width: 420px; width: 100%; padding: 24px;
+  }
+  /* Logo, título e subtítulo centralizados; rótulo e campo seguem
+     à esquerda. Centralizar só a logo, com o texto à esquerda,
+     lia como desalinhamento — que foi o primeiro comentário de
+     quem viu a tela. */
+  #tela-login .marca { text-align: center; margin-bottom: 26px; }
+
+  /* Centralização ÓPTICA, não geométrica. O logo é uma florzinha
+     fina à esquerda e um texto cheio à direita: o peso visual cai
+     à direita do meio do arquivo, e centralizar pelo pixel faz o
+     conjunto parecer empurrado para a direita.
+     Os 6px (4% da largura) compensam isso. Se ainda parecer
+     torto, mexa só neste número — mais negativo empurra para a
+     esquerda. */
+  #tela-login .marca img {
+    width: 150px; height: auto; display: inline-block;
+    transform: translateX(-6px);
+  }
+  #tela-login h2 { margin: 0 0 6px; font-size: 26px; letter-spacing: -.02em; text-align: center; }
+  #tela-login p.sub { margin: 0 0 28px; color: var(--texto-fraco); font-size: 15px; text-align: center; }
+  /* O rótulo já vem depois do respiro do subtítulo; a margem
+     padrão dele somaria 46px de vazio no meio da tela. */
+  #passo-email .rotulo, #passo-codigo .rotulo { margin-top: 0; }
+  #codigo-otp { letter-spacing: .4em; text-align: center; font-size: 26px; font-weight: 700; padding-left: 22px; }
+
+  /* ---------- scanner ----------
+
+     A câmera ocupa a tela inteira e os controles flutuam por cima.
+     Antes ela era uma faixa de 50vh com uma barra preta embaixo:
+     metade da tela desperdiçada justamente na hora de mirar um QR
+     de 34mm a um braço de distância.
+
+     display:block sobrescreve o flex de .tela.ativa — aqui os
+     filhos são posicionados, não empilhados. */
+  #tela-scanner.ativa {
+    display: block; position: relative;
+    height: 100dvh; overflow: hidden; background: #000;
+  }
+  #leitor { position: absolute; inset: 0; background: #000; }
+  #leitor video { width: 100% !important; height: 100% !important; object-fit: cover; }
+
+  /* A html5-qrcode desenha a própria moldura quando `qrbox` está
+     definido. Ela não acompanha o raio nem a cor da nossa mira e
+     apareceria por baixo dela, como duas molduras tortas. Sumir
+     com o desenho não muda a leitura: o qrbox recorta o quadro
+     analisado, e isso continua valendo. */
+  #leitor #qr-shaded-region { display: none !important; }
+
+  /* A mira. O box-shadow gigante escurece tudo menos o quadrado do
+     meio — um recorte sem precisar de máscara nem SVG. O lado
+     acompanha o qrbox da biblioteca (72% do menor lado), senão a
+     moldura mentiria sobre onde a leitura acontece. */
+  .mira { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+  .mira-janela {
+    position: relative;
+    width: min(72vw, 300px); aspect-ratio: 1;
+    border-radius: 28px;
+    box-shadow: 0 0 0 100vmax rgba(0,0,0,.55);
+  }
+  .mira-janela::before, .mira-janela::after {
+    content: ''; position: absolute; width: 44px; height: 44px;
+    border: 4px solid #fff;
+  }
+  .mira-janela::before { top: -2px; left: -2px; border-right: 0; border-bottom: 0; border-radius: 28px 0 0 0; }
+  .mira-janela::after { bottom: -2px; right: -2px; border-left: 0; border-top: 0; border-radius: 0 0 28px 0; }
+
+  /* Gradiente e não faixa sólida: a borda dura cortando a imagem da
+     câmera é o que mais fazia a tela parecer inacabada. */
+  .scanner-topo {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 2;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: max(14px, env(safe-area-inset-top)) 18px 28px;
+    color: #fff; font-size: 14px;
+    background: linear-gradient(rgba(0,0,0,.6), rgba(0,0,0,0));
+  }
+  .scanner-base {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+    padding: 40px 16px max(16px, env(safe-area-inset-bottom));
+    background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.72) 45%);
+  }
+  .scanner-base .aviso { margin-bottom: 12px; }
+  .dica { margin: 0 0 14px; text-align: center; color: rgba(255,255,255,.9); font-size: 15px; }
+  .acoes { display: flex; gap: 10px; }
+  .acoes .btn { flex: 1; }
+
+  .linha-status { display: flex; align-items: center; gap: 6px; }
+  .contador {
+    font-size: 14px; font-weight: 700;
+    background: rgba(255,255,255,.16); border-radius: 999px; padding: 5px 12px;
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  }
+  .ponto { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .ponto.online  { background: #38d07f; box-shadow: 0 0 0 3px rgba(56,208,127,.25); }
+  .ponto.offline { background: #ffb020; box-shadow: 0 0 0 3px rgba(255,176,32,.25); }
+
+  /* Entrada manual como folha que sobe, em vez de empurrar o
+     layout: a câmera continua ligada atrás, e fechar não custa
+     reiniciá-la. */
+  .folha {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
+    background: var(--fundo); color: var(--texto);
+    border-radius: 22px 22px 0 0;
+    padding: 6px 16px max(18px, env(safe-area-inset-bottom));
+    box-shadow: 0 -8px 32px rgba(0,0,0,.4);
+  }
+  .folha::before {
+    content: ''; display: block; width: 44px; height: 5px; border-radius: 999px;
+    background: var(--borda); margin: 8px auto 6px;
+  }
+
+  /* ---------- perfil ---------- */
+  .nome-aluno { font-size: 27px; font-weight: 700; margin: 0 0 6px; line-height: 1.15; letter-spacing: -.02em; }
+
+  /* O código curto em monoespaçada e espaçado é o mesmo desenho do
+     crachá impresso. Quem confere no balcão compara os dois lado a
+     lado, e formatos diferentes atrasam essa conferência. */
+  #perfil-codigo {
+    display: inline-block; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 13px; font-weight: 700; letter-spacing: .16em;
+    background: var(--fundo); border-radius: 8px; padding: 4px 10px;
+  }
+
+  .dado { display: flex; gap: 12px; padding: 12px 0; border-top: 1px solid var(--borda); }
+  .dado dt { flex: 0 0 88px; margin: 0; color: var(--texto-fraco); font-size: 13px;
+             text-transform: uppercase; letter-spacing: .04em; font-weight: 650; padding-top: 2px; }
+  .dado dd { margin: 0; flex: 1; word-break: break-word; }
+  .dado a { color: var(--azul); font-weight: 600; }
+
+  .notas { display: flex; gap: 8px; }
+  .notas button {
+    flex: 1; min-height: 58px; border: 1.5px solid var(--borda); background: var(--superficie);
+    border-radius: 14px; font-size: 20px; font-weight: 700; color: var(--texto-fraco);
+    cursor: pointer; transition: transform .06s ease;
+  }
+  .notas button:active { transform: scale(.95); }
+  .notas button[aria-pressed="true"] {
+    background: var(--azul); border-color: var(--azul); color: #fff;
+    box-shadow: 0 2px 8px rgba(20,120,208,.3);
+  }
+
+  .rodape-fixo {
+    position: sticky; bottom: 0; z-index: 5;
+    background: rgba(243,242,242,.92);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    padding: 12px 16px max(12px, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--borda);
+  }
+
+  /* ---------- contatos ---------- */
+  #busca { position: sticky; top: 0; z-index: 5; }
+  .item-contato {
+    background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--raio);
+    padding: 15px 16px; margin-bottom: 10px; box-shadow: var(--sombra);
+    display: flex; align-items: center; gap: 12px;
+    cursor: pointer; transition: transform .06s ease;
+  }
+  .item-contato:active { transform: scale(.99); border-color: var(--azul); }
+  .item-contato .corpo { flex: 1; min-width: 0; }
+
+  /* A seta é o que diz que a linha abre. Sem ela o cartão parece
+     um resumo estático — foi exatamente essa a dúvida de quem
+     testou primeiro. */
+  .item-contato .seta { flex: none; color: #b6b1ae; font-size: 22px; line-height: 1; }
+
+  .item-contato h3 { margin: 0 0 5px; font-size: 17px; letter-spacing: -.01em; }
+  .item-contato .meta { color: var(--texto-fraco); font-size: 14px; line-height: 1.4; }
+  .vazio { text-align: center; color: var(--texto-fraco); padding: 56px 16px; }
+
+  .oculto { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     TELA 1 — LOGIN
+     ============================================================ -->
+<section id="tela-login" class="tela ativa">
+  <div class="conteudo">
+    <!-- A logo é cacheada pelo service worker junto com a página:
+         sem isso, a tela de login abre quebrada quando o Wi-Fi do
+         local cai, que é o cenário para o qual o cache existe. -->
+    <div class="marca"><img src="logo-email.png" alt="Alfacem Global Academy"></div>
+
+    <h2>Contact capture</h2>
+    <p class="sub">Access restricted to registered representatives.</p>
+
+    <div id="login-aviso" class="aviso"></div>
+
+    <div id="passo-email">
+      <label class="rotulo" for="email">Your email</label>
+      <input id="email" class="campo" type="email" inputmode="email"
+             autocomplete="email" autocapitalize="none" spellcheck="false"
+             placeholder="you@company.com">
+      <div style="height:16px"></div>
+      <button id="btn-enviar-codigo" class="btn">Send code</button>
+    </div>
+
+    <div id="passo-codigo" class="oculto">
+      <label class="rotulo" for="codigo-otp">Code received by email</label>
+      <!-- Aceita de 6 a 8 dígitos de propósito. O comprimento do OTP
+           é configurável no Supabase (Authentication > Providers >
+           Email > Email OTP Length); o projeto usa 6, mas o campo
+           tolera 8 para não travar o login se alguém mexer nisso. -->
+      <input id="codigo-otp" class="campo" type="text" inputmode="numeric"
+             autocomplete="one-time-code" maxlength="8" placeholder="········">
+      <div style="height:16px"></div>
+      <button id="btn-verificar" class="btn">Sign in</button>
+      <div style="height:10px"></div>
+      <button id="btn-trocar-email" class="btn secundario">Use a different email</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     TELA 2 — SCANNER
+     ============================================================ -->
+<section id="tela-scanner" class="tela">
+  <div id="leitor"></div>
+
+  <div class="mira" aria-hidden="true"><div class="mira-janela"></div></div>
+
+  <div class="scanner-topo">
+    <span class="linha-status">
+      <span id="ponto-rede" class="ponto online"></span><span id="texto-rede">Online</span>
+    </span>
+    <span class="contador"><span id="contador-salvos">0</span> saved</span>
+  </div>
+
+  <div class="scanner-base">
+    <div id="scanner-aviso" class="aviso"></div>
+    <p class="dica">Point the camera at the badge QR code</p>
+    <div class="acoes">
+      <button id="btn-alternar-manual" class="btn fantasma pequeno">Type code</button>
+      <button id="btn-ver-contatos" class="btn fantasma pequeno">My contacts</button>
+    </div>
+  </div>
+
+  <div id="bloco-manual" class="folha oculto">
+    <label class="rotulo" for="codigo-curto">Code printed on the badge</label>
+    <input id="codigo-curto" class="campo" type="text" maxlength="6"
+           autocapitalize="characters" autocomplete="off" spellcheck="false"
+           placeholder="ABC234" style="text-transform:uppercase;letter-spacing:.3em;text-align:center;font-weight:700">
+    <div style="height:10px"></div>
+    <button id="btn-buscar-manual" class="btn">Look up</button>
+  </div>
+</section>
+
+<!-- ============================================================
+     TELA 3 — PERFIL
+     ============================================================ -->
+<section id="tela-perfil" class="tela">
+  <div class="cabecalho">
+    <button id="btn-voltar-scanner" class="btn fantasma pequeno">Back</button>
+    <h1>Profile</h1>
+    <span id="selo-salvo"></span>
+  </div>
+
+  <div class="conteudo">
+    <div id="perfil-aviso" class="aviso"></div>
+
+    <div class="cartao">
+      <p id="perfil-nome" class="nome-aluno"></p>
+      <p id="perfil-codigo" class="meta" style="color:var(--texto-fraco);font-size:14px;margin:0"></p>
+      <dl id="perfil-dados" style="margin:14px 0 0"></dl>
+    </div>
+
+    <div id="bloco-avaliacao">
+      <label class="rotulo">Rating (optional)</label>
+      <div class="notas" id="notas" role="group" aria-label="Rating from 1 to 5">
+        <button type="button" data-nota="1" aria-pressed="false">1</button>
+        <button type="button" data-nota="2" aria-pressed="false">2</button>
+        <button type="button" data-nota="3" aria-pressed="false">3</button>
+        <button type="button" data-nota="4" aria-pressed="false">4</button>
+        <button type="button" data-nota="5" aria-pressed="false">5</button>
+      </div>
+
+      <label class="rotulo" for="comentario">Comment (optional)</label>
+      <textarea id="comentario" class="campo" rows="3"
+                placeholder="E.g. robotics project, great technical skills"></textarea>
+    </div>
+  </div>
+
+  <div class="rodape-fixo">
+    <button id="btn-salvar" class="btn">Save contact</button>
+  </div>
+</section>
+
+<!-- ============================================================
+     TELA 4 — MEUS CONTATOS
+     ============================================================ -->
+<section id="tela-contatos" class="tela">
+  <div class="cabecalho">
+    <button id="btn-voltar-scanner-2" class="btn fantasma pequeno">Back</button>
+    <h1>My contacts</h1>
+    <button id="btn-sair" class="btn fantasma pequeno">Sign out</button>
+  </div>
+
+  <div class="conteudo">
+    <div id="contatos-aviso" class="aviso"></div>
+    <input id="busca" class="campo" type="search" placeholder="Search by name" autocomplete="off">
+    <div style="height:14px"></div>
+    <div id="lista-contatos"></div>
+  </div>
+</section>
+
+<script>
+/* ============================================================
+   CONFIGURAÇÃO
+   A chave `anon` no HTML é esperada e correta: ela não dá acesso
+   a nada sozinha. `alunos` tem RLS ativo sem policy e as funções
+   de leitura só aceitam sessão de avaliador cadastrado.
+   `service_role` NUNCA entra aqui — só no n8n.
+   ============================================================ */
+const SUPABASE_URL      = window.CONFIG.SUPABASE_URL;
+const SUPABASE_ANON_KEY = window.CONFIG.SUPABASE_ANON_KEY;
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+});
+
+/* ============================================================
+   ARMAZENAMENTO LOCAL
+   Tudo em try/catch: Safari em navegação privada lança ao gravar.
+   ============================================================ */
+const CHAVES = {
+  fila:     'fila_v1',      // salvamentos pendentes de sincronização
+  contatos: 'contatos_v1',  // cache da lista "Meus contatos"
+  perfis:   'perfis_v1',    // cache código -> perfil, para re-scan offline
+  falhas:   'falhas_v1'     // itens da fila rejeitados definitivamente
+};
+
+function ler(chave, padrao) {
+  try { const v = localStorage.getItem(chave); return v ? JSON.parse(v) : padrao; }
+  catch (e) { return padrao; }
+}
+function gravar(chave, valor) {
+  try { localStorage.setItem(chave, JSON.stringify(valor)); return true; }
+  catch (e) { return false; }
+}
+
+/* ============================================================
+   ESTADO
+   ============================================================ */
+const estado = {
+  perfil: null,        // perfil exibido na tela 3
+  codigoAtual: null,   // código lido (token do QR ou código curto)
+  nota: null,
+  telaAtual: 'login',
+  voltarPara: 'scanner',   // para onde o Voltar do perfil leva
+  ultimaLeitura: { codigo: null, em: 0 },
+  sincronizando: false
+};
+
+let leitorQr = null;
+let audio = null;
+
+/* ============================================================
+   UTILIDADES
+   ============================================================ */
+const $ = sel => document.querySelector(sel);
+
+function escapar(t) {
+  return String(t == null ? '' : t)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function mostrarAviso(seletor, texto, tipo) {
+  const el = $(seletor);
+  el.className = 'aviso' + (texto ? ' ' + (tipo || 'erro') : '');
+  el.textContent = texto || '';
+}
+
+/**
+ * O QR guarda uma URL (https://app.evento.com/#/p/<token>).
+ * Aceita também o token cru, caso o gerador de crachás mude.
+ */
+function extrairCodigo(bruto) {
+  const t = String(bruto || '').trim();
+  const m = t.match(/\/p\/([A-Za-z0-9_-]+)/);
+  if (m) return m[1];
+  const ultimo = t.match(/([A-Za-z0-9_-]{6,})\s*$/);
+  return ultimo ? ultimo[1] : t;
+}
+
+/** Traduz exceção do Postgres / falha de rede para o avaliador. */
+function traduzirErro(e) {
+  const msg = (e && (e.message || e.error_description || e.msg) || '').toString();
+
+  if (/cracha_nao_encontrado/.test(msg)) return 'Badge not found. Check the printed code.';
+  if (/aluno_nao_autoriza/.test(msg))    return 'This student chose not to share contact details.';
+  if (/sem_permissao/.test(msg))         return 'Your account is not on the representatives list. Contact the organizers.';
+  if (/nao_autenticado/.test(msg))       return 'Session expired. Sign in again.';
+
+  if (/Signups not allowed|signup_disabled/i.test(msg))
+    return 'Email not registered as a representative.';
+  if (/Token has expired|invalid|expired/i.test(msg))
+    return 'Invalid or expired code. Request a new one.';
+  if (/rate limit|too many|429/i.test(msg))
+    return 'Too many attempts. Wait a minute and try again.';
+
+  if (ehErroDeRede(e)) return 'No connection to the server.';
+  return msg || 'Unexpected error.';
+}
+
+function ehErroDeRede(e) {
+  if (!navigator.onLine) return true;
+  const msg = (e && (e.message || '') || '').toString();
+  return /failed to fetch|networkerror|load failed|network request failed|timeout|aborted/i.test(msg);
+}
+
+/* Feedback tátil e sonoro — o avaliador não olha a tela ao mirar. */
+function bipar() {
+  try {
+    if (!audio) audio = new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === 'suspended') audio.resume();
+    const osc = audio.createOscillator();
+    const vol = audio.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 880;
+    vol.gain.setValueAtTime(0.0001, audio.currentTime);
+    vol.gain.exponentialRampToValueAtTime(0.25, audio.currentTime + 0.01);
+    vol.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.14);
+    osc.connect(vol); vol.connect(audio.destination);
+    osc.start(); osc.stop(audio.currentTime + 0.15);
+  } catch (e) { /* som é acessório */ }
+}
+
+function vibrar(padrao) {
+  try { if (navigator.vibrate) navigator.vibrate(padrao); } catch (e) {}
+}
+
+/* ============================================================
+   NAVEGAÇÃO ENTRE TELAS
+   ============================================================ */
+async function irPara(tela) {
+  if (estado.telaAtual === 'scanner' && tela !== 'scanner') await pararScanner();
+
+  document.querySelectorAll('.tela').forEach(s => s.classList.remove('ativa'));
+  $('#tela-' + tela).classList.add('ativa');
+  estado.telaAtual = tela;
+  window.scrollTo(0, 0);
+
+  if (tela === 'scanner')  { atualizarContador(); await iniciarScanner(); }
+  if (tela === 'contatos') { renderizarContatos(); revalidarContatos(); }
+}
+
+/* ============================================================
+   TELA 1 — LOGIN
+   ============================================================ */
+$('#btn-enviar-codigo').addEventListener('click', async () => {
+  const email = $('#email').value.trim().toLowerCase();
+  if (!email || !email.includes('@')) {
+    return mostrarAviso('#login-aviso', 'Enter a valid email.');
+  }
+
+  const botao = $('#btn-enviar-codigo');
+  botao.disabled = true; botao.textContent = 'Sending…';
+  mostrarAviso('#login-aviso', '');
+
+  try {
+    // shouldCreateUser: false — e-mail fora da lista recebe erro
+    // e não gera usuário novo.
+    const { error } = await sb.auth.signInWithOtp({
+      email, options: { shouldCreateUser: false }
+    });
+    if (error) throw error;
+
+    $('#passo-email').classList.add('oculto');
+    $('#passo-codigo').classList.remove('oculto');
+    $('#codigo-otp').value = '';
+    $('#btn-verificar').disabled = true;
+    mostrarAviso('#login-aviso', 'Code sent to ' + email + '. Check your spam folder too.', 'ok');
+    $('#codigo-otp').focus();
+  } catch (e) {
+    mostrarAviso('#login-aviso', traduzirErro(e));
+  } finally {
+    botao.disabled = false; botao.textContent = 'Send code';
+  }
+});
+
+/* O código OTP é de uso único: o servidor o queima na primeira
+   tentativa, dando certo ou não. Duas chamadas em sequência
+   fazem a segunda falhar com "inválido ou expirado" mesmo o
+   código estando correto — por isso o trinco abaixo. */
+let verificandoOtp = false;
+
+$('#btn-verificar').addEventListener('click', async () => {
+  if (verificandoOtp) return;
+
+  const email = $('#email').value.trim().toLowerCase();
+  const token = $('#codigo-otp').value.trim();
+  if (token.length < 6) return mostrarAviso('#login-aviso', 'Enter the 6 digits.');
+
+  verificandoOtp = true;
+  const botao = $('#btn-verificar');
+  botao.disabled = true; botao.textContent = 'Signing in…';
+
+  try {
+    const { error } = await sb.auth.verifyOtp({ email, token, type: 'email' });
+    if (error) throw error;
+    bipar(); // desbloqueia o AudioContext no gesto do usuário
+    await entrar();
+  } catch (e) {
+    mostrarAviso('#login-aviso', traduzirErro(e));
+    // Limpa o campo: o código já foi queimado no servidor, reenviar
+    // o mesmo número só repete o erro.
+    $('#codigo-otp').value = '';
+    $('#codigo-otp').focus();
+  } finally {
+    verificandoOtp = false;
+    botao.textContent = 'Sign in';
+    botao.disabled = $('#codigo-otp').value.length < 6;
+  }
+});
+
+$('#btn-trocar-email').addEventListener('click', () => {
+  $('#passo-codigo').classList.add('oculto');
+  $('#passo-email').classList.remove('oculto');
+  $('#codigo-otp').value = '';
+  mostrarAviso('#login-aviso', '');
+});
+
+/* Sem envio automático ao completar N dígitos.
+   Como o comprimento do código é configurável no Supabase, disparar
+   sozinho num tamanho fixo queima um código válido pela metade —
+   e o código é de uso único, então não há segunda chance. O login
+   acontece uma vez por avaliador no dia; um toque a mais não custa. */
+$('#codigo-otp').addEventListener('input', e => {
+  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 8);
+  $('#btn-verificar').disabled = e.target.value.length < 6;
+});
+
+async function entrar() {
+  await irPara('scanner');
+  sincronizar();
+  revalidarContatos();
+}
+
+$('#btn-sair').addEventListener('click', async () => {
+  const pendentes = ler(CHAVES.fila, []).length;
+  if (pendentes && !confirm(pendentes + ' contact(s) not yet synced. Sign out anyway?')) return;
+  await pararScanner();
+  await sb.auth.signOut();
+  location.reload();
+});
+
+/* ============================================================
+   TELA 2 — SCANNER
+   ============================================================ */
+async function iniciarScanner() {
+  if (leitorQr) return;
+  mostrarAviso('#scanner-aviso', '');
+
+  try {
+    leitorQr = new Html5Qrcode('leitor', {
+      verbose: false,
+      // BarcodeDetector nativa tem suporte inconsistente no Safari iOS.
+      // Forçamos o decodificador wasm da biblioteca.
+      experimentalFeatures: { useBarCodeDetectorIfSupported: false }
+    });
+
+    await leitorQr.start(
+      { facingMode: 'environment' },
+      {
+        fps: 10,
+        qrbox: (larg, alt) => {
+          const lado = Math.floor(Math.min(larg, alt) * 0.72);
+          return { width: lado, height: lado };
+        }
+      },
+      aoLerQr,
+      () => { /* frame sem QR: silencioso, acontece o tempo todo */ }
+    );
+  } catch (e) {
+    leitorQr = null;
+    mostrarAviso('#scanner-aviso',
+      'Camera unavailable. Use the code printed on the badge.', 'atencao');
+    abrirEntradaManual();
+  }
+}
+
+async function pararScanner() {
+  if (!leitorQr) return;
+  try { await leitorQr.stop(); } catch (e) {}
+  try { leitorQr.clear(); } catch (e) {}
+  leitorQr = null;
+}
+
+function aoLerQr(texto) {
+  const codigo = extrairCodigo(texto);
+  const agora = Date.now();
+
+  // Evita reprocessar o mesmo crachá enquanto ele segue na frente da câmera.
+  if (estado.ultimaLeitura.codigo === codigo && agora - estado.ultimaLeitura.em < 3000) return;
+  estado.ultimaLeitura = { codigo, em: agora };
+
+  bipar();
+  vibrar(60);
+  abrirPerfil(codigo);
+}
+
+$('#btn-alternar-manual').addEventListener('click', () => {
+  const bloco = $('#bloco-manual');
+  if (bloco.classList.contains('oculto')) abrirEntradaManual();
+  else bloco.classList.add('oculto');
+});
+
+function abrirEntradaManual() {
+  $('#bloco-manual').classList.remove('oculto');
+  $('#codigo-curto').focus();
+}
+
+$('#codigo-curto').addEventListener('input', e => {
+  e.target.value = e.target.value.toUpperCase().replace(/[^0-9A-Z]/g, '').slice(0, 6);
+});
+
+$('#btn-buscar-manual').addEventListener('click', () => {
+  const codigo = $('#codigo-curto').value.trim();
+  if (codigo.length !== 6) return mostrarAviso('#scanner-aviso', 'The code has 6 characters.');
+  $('#codigo-curto').value = '';
+  $('#bloco-manual').classList.add('oculto');
+  abrirPerfil(codigo);
+});
+
+$('#btn-ver-contatos').addEventListener('click', () => irPara('contatos'));
+
+/* ============================================================
+   TELA 3 — PERFIL
+   ============================================================ */
+/* `origem` diz para onde o botão Voltar leva. Vindo da lista de
+   contatos, cair na câmera perderia o lugar onde a pessoa estava
+   rolando — e reiniciaria o scanner sem necessidade. */
+async function abrirPerfil(codigo, origem) {
+  estado.voltarPara = origem === 'contatos' ? 'contatos' : 'scanner';
+  estado.codigoAtual = codigo;
+  estado.perfil = null;
+  estado.nota = null;
+  $('#comentario').value = '';
+  document.querySelectorAll('#notas button').forEach(b => b.setAttribute('aria-pressed', 'false'));
+
+  $('#perfil-nome').textContent = 'Loading…';
+  $('#perfil-codigo').textContent = '';
+  $('#perfil-dados').innerHTML = '';
+  $('#selo-salvo').innerHTML = '';
+  mostrarAviso('#perfil-aviso', '');
+  $('#btn-salvar').disabled = true;
+
+  await irPara('perfil');
+
+  try {
+    const { data, error } = await sb.rpc('buscar_aluno', { p_codigo: codigo });
+    if (error) throw error;
+
+    // Cache para o caso de o mesmo crachá ser lido de novo sem rede.
+    const perfis = ler(CHAVES.perfis, {});
+    perfis[codigo] = data;
+    gravar(CHAVES.perfis, perfis);
+
+    renderizarPerfil(data);
+  } catch (e) {
+    if (ehErroDeRede(e)) {
+      const cache = ler(CHAVES.perfis, {})[codigo];
+      if (cache) {
+        mostrarAviso('#perfil-aviso', 'No connection — showing locally cached data.', 'atencao');
+        renderizarPerfil(cache);
+      } else {
+        renderizarPerfilOffline(codigo);
+      }
+    } else {
+      $('#perfil-nome').textContent = '—';
+      mostrarAviso('#perfil-aviso', traduzirErro(e));
+      $('#bloco-avaliacao').classList.add('oculto');
+      vibrar([80, 60, 80]);
+    }
+  }
+}
+
+function renderizarPerfil(perfil) {
+  estado.perfil = perfil;
+  $('#bloco-avaliacao').classList.remove('oculto');
+  /* Counselor e docente compartilham o cartão: os dois vêm
+     sozinhos e o que importa é instituição e contato. O rótulo
+     é que muda. */
+  const ehProfissional = perfil.tipo === 'counselor' || perfil.tipo === 'docente';
+  const rotuloPerfil = perfil.tipo === 'counselor' ? 'College Counselor'
+                     : perfil.tipo === 'docente'   ? 'Teacher' : '';
+
+  $('#perfil-nome').textContent = perfil.nome || '—';
+  $('#perfil-codigo').textContent = [
+    rotuloPerfil,
+    perfil.codigo_curto ? 'Code ' + perfil.codigo_curto : ''
+  ].filter(Boolean).join(' · ');
+
+  // Os rótulos abaixo precisam bater com as chaves que
+  // perfil_aluno() devolve. Já saíram de sincronia uma vez: a
+  // migration 0007 trocou o perfil da plataforma de avaliadores
+  // (turma/projeto/resumo/linkedin) pelo da feira, e esta lista
+  // ficou pedindo os campos antigos — o representante escaneava
+  // um crachá e não via série, unidade nem país de interesse,
+  // que é justamente o que a feira existe para mostrar.
+  // Mexeu em perfil_aluno? Confira aqui.
+  const paises = Array.isArray(perfil.paises)
+    ? perfil.paises.join(', ')
+    : perfil.paises;
+
+  const linhas = ehProfissional ? [
+    ['Institution', perfil.instituicao],
+    ['Email',       perfil.email,    'mailto:'],
+    ['Phone',       perfil.telefone, 'tel:']
+  ] : [
+    ['School',   perfil.escola],
+    ['Campus',   perfil.unidade],
+    ['Segment',  perfil.segmento],
+    ['Year',     perfil.ano],
+    ['Countries of interest',     paises],
+    ['Interest',                  perfil.motivo],
+    ['International experience',  perfil.experiencia],
+    ['Knows the Pathway',         perfil.pathway],
+    ['Email', perfil.email,    'mailto:'],
+    ['Phone', perfil.telefone, 'tel:'],
+    // Contato do responsável: opt-in próprio, independente do
+    // nível do aluno. Pode ser o único canal disponível.
+    ['Guardian',          perfil.responsavel_nome],
+    ['Guardian\'s email', perfil.responsavel_email,    'mailto:'],
+    ['Guardian\'s phone', perfil.responsavel_telefone, 'tel:']
+  ];
+
+  $('#perfil-dados').innerHTML = linhas
+    .filter(([, valor]) => valor)
+    .map(([rotulo, valor, tipo]) => {
+      let conteudo = escapar(valor);
+      if (tipo === 'mailto:' || tipo === 'tel:') {
+        conteudo = '<a href="' + tipo + escapar(valor) + '">' + escapar(valor) + '</a>';
+      } else if (tipo === 'url') {
+        const href = /^https?:\/\//i.test(valor) ? valor : 'https://' + valor;
+        conteudo = '<a href="' + escapar(href) + '" target="_blank" rel="noopener">' + escapar(valor) + '</a>';
+      }
+      return '<div class="dado"><dt>' + rotulo + '</dt><dd>' + conteudo + '</dd></div>';
+    }).join('');
+
+  const jaSalvo = perfil.ja_salvo || estaNaFila(estado.codigoAtual);
+
+  // Quem decide se pode salvar é o servidor. O fallback existe só
+  // para perfis em cache gravados antes da migration 0005.
+  const podeSalvar = (perfil.pode_salvar !== undefined)
+    ? perfil.pode_salvar
+    : perfil.nivel > 0;
+
+  if (!podeSalvar) {
+    mostrarAviso('#perfil-aviso',
+      'This student chose not to share contact details.', 'atencao');
+    $('#selo-salvo').innerHTML = '<span class="selo bloqueado">No consent</span>';
+    $('#bloco-avaliacao').classList.add('oculto');
+    $('#btn-salvar').disabled = true;
+    $('#btn-salvar').textContent = 'Cannot save';
+    return;
+  }
+
+  // Aluno não compartilha os próprios dados, mas o responsável
+  // autorizou. O avaliador precisa saber com quem vai falar.
+  if (perfil.nivel === 0) {
+    mostrarAviso('#perfil-aviso',
+      'The student does not share their own details. The contact info is the guardian\'s.', 'atencao');
+  }
+
+  // Re-scan de quem já foi salvo abre com o que este avaliador
+  // escreveu antes, não com o formulário em branco.
+  if (perfil.minha_nota) {
+    estado.nota = Number(perfil.minha_nota);
+    document.querySelectorAll('#notas button').forEach(b => {
+      b.setAttribute('aria-pressed', String(Number(b.dataset.nota) === estado.nota));
+    });
+  }
+  if (perfil.meu_comentario) $('#comentario').value = perfil.meu_comentario;
+
+  $('#selo-salvo').innerHTML = jaSalvo ? '<span class="selo ok">Already saved</span>' : '';
+  $('#btn-salvar').disabled = false;
+  $('#btn-salvar').textContent = jaSalvo ? 'Update contact' : 'Save contact';
+}
+
+/**
+ * Scan sem rede e sem cache: não dá para mostrar o perfil, mas dá
+ * para não perder o contato. Enfileira pelo código; o nome aparece
+ * depois da sincronização.
+ */
+function renderizarPerfilOffline(codigo) {
+  estado.perfil = null;
+  $('#perfil-nome').textContent = 'Badge ' + codigo.slice(0, 6).toUpperCase();
+  $('#perfil-codigo').textContent = '';
+  $('#perfil-dados').innerHTML = '';
+  $('#bloco-avaliacao').classList.remove('oculto');
+  mostrarAviso('#perfil-aviso',
+    'No connection. The contact will be queued and the profile will load once the network is back.', 'atencao');
+  $('#selo-salvo').innerHTML = '<span class="selo pendente">Offline</span>';
+  $('#btn-salvar').disabled = false;
+  $('#btn-salvar').textContent = 'Save to queue';
+}
+
+document.querySelectorAll('#notas button').forEach(botao => {
+  botao.addEventListener('click', () => {
+    const nota = Number(botao.dataset.nota);
+    estado.nota = (estado.nota === nota) ? null : nota;   // clicar de novo desmarca
+    document.querySelectorAll('#notas button').forEach(b => {
+      b.setAttribute('aria-pressed', String(Number(b.dataset.nota) === estado.nota));
+    });
+    vibrar(15);
+  });
+});
+
+$('#btn-voltar-scanner').addEventListener('click', () => irPara(estado.voltarPara || 'scanner'));
+$('#btn-voltar-scanner-2').addEventListener('click', () => irPara('scanner'));
+
+$('#btn-salvar').addEventListener('click', async () => {
+  const botao = $('#btn-salvar');
+  botao.disabled = true;
+
+  const item = {
+    id: 'f' + Date.now() + Math.random().toString(36).slice(2, 7),
+    codigo: estado.codigoAtual,
+    nota: estado.nota,
+    comentario: $('#comentario').value.trim() || null,
+    em: new Date().toISOString(),
+    nome: estado.perfil ? estado.perfil.nome : null
+  };
+
+  if (!navigator.onLine) {
+    enfileirar(item);
+    concluirSalvamento('Saved to queue. It will sync when the network is back.', 'atencao');
+    return;
+  }
+
+  try {
+    const { data, error } = await sb.rpc('salvar_contato', {
+      p_codigo: item.codigo, p_nota: item.nota, p_comentario: item.comentario
+    });
+    if (error) throw error;
+
+    guardarContatoLocal(data, item);
+    concluirSalvamento('Contact saved.', 'ok');
+  } catch (e) {
+    if (ehErroDeRede(e)) {
+      enfileirar(item);
+      concluirSalvamento('No connection. Saved to queue.', 'atencao');
+    } else {
+      mostrarAviso('#perfil-aviso', traduzirErro(e));
+      vibrar([80, 60, 80]);
+      botao.disabled = false;
+    }
+  }
+});
+
+function concluirSalvamento(texto, tipo) {
+  mostrarAviso('#perfil-aviso', texto, tipo);
+  vibrar([40, 40, 40]);
+  atualizarContador();
+  // Volta sozinho ao scanner: o avaliador está de pé, com uma mão só.
+  setTimeout(() => { if (estado.telaAtual === 'perfil') irPara('scanner'); }, 2000);
+}
+
+/* ============================================================
+   FILA OFFLINE
+   ============================================================ */
+function enfileirar(item) {
+  const fila = ler(CHAVES.fila, []);
+  // Mesmo crachá enfileirado duas vezes: a última leitura vence.
+  const i = fila.findIndex(f => f.codigo === item.codigo);
+  if (i >= 0) fila[i] = item; else fila.push(item);
+
+  if (!gravar(CHAVES.fila, fila)) {
+    mostrarAviso('#perfil-aviso',
+      'Could not save to the local queue. Write the code down on paper.', 'erro');
+  }
+}
+
+function estaNaFila(codigo) {
+  return ler(CHAVES.fila, []).some(f => f.codigo === codigo);
+}
+
+async function sincronizar() {
+  if (estado.sincronizando || !navigator.onLine) return;
+
+  const { data: sessao } = await sb.auth.getSession();
+  if (!sessao || !sessao.session) return;
+
+  const fila = ler(CHAVES.fila, []);
+  if (!fila.length) return;
+
+  estado.sincronizando = true;
+  const restantes = [];
+  const falhas = ler(CHAVES.falhas, []);
+  let enviados = 0;
+
+  for (const item of fila) {
+    try {
+      const { data, error } = await sb.rpc('salvar_contato', {
+        p_codigo: item.codigo, p_nota: item.nota, p_comentario: item.comentario
+      });
+      if (error) throw error;
+      guardarContatoLocal(data, item);
+      enviados++;
+    } catch (e) {
+      if (ehErroDeRede(e)) {
+        // Rede caiu no meio: guarda o resto e tenta na próxima rodada.
+        restantes.push(item);
+      } else {
+        // Rejeição definitiva (crachá inexistente, nível 0, sem permissão).
+        // Some da fila mas fica registrada — o avaliador precisa saber.
+        falhas.push({ codigo: item.codigo, motivo: traduzirErro(e), em: item.em });
+      }
+    }
+  }
+
+  gravar(CHAVES.fila, restantes);
+  gravar(CHAVES.falhas, falhas.slice(-50));
+  estado.sincronizando = false;
+
+  atualizarContador();
+  if (enviados) revalidarContatos();
+  if (estado.telaAtual === 'contatos') renderizarContatos();
+}
+
+/* Dispara na volta da rede e a cada 30s. */
+window.addEventListener('online',  () => { atualizarRede(); sincronizar(); });
+window.addEventListener('offline', atualizarRede);
+setInterval(sincronizar, 30000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) sincronizar(); });
+
+function atualizarRede() {
+  const online = navigator.onLine;
+  $('#ponto-rede').className = 'ponto ' + (online ? 'online' : 'offline');
+  $('#texto-rede').textContent = online ? 'Online' : 'Offline — saving to queue';
+}
+
+/* ============================================================
+   CONTATOS — cache local + revalidação
+   ============================================================ */
+function guardarContatoLocal(perfil, item) {
+  if (!perfil) return;
+  const contatos = ler(CHAVES.contatos, []);
+  const registro = Object.assign({}, perfil, {
+    nota: item ? item.nota : perfil.nota,
+    comentario: item ? item.comentario : perfil.comentario,
+    salvo_em: (item && item.em) || new Date().toISOString()
+  });
+  const i = contatos.findIndex(c => c.aluno_id === registro.aluno_id);
+  if (i >= 0) contatos[i] = registro; else contatos.unshift(registro);
+  gravar(CHAVES.contatos, contatos);
+}
+
+async function revalidarContatos() {
+  if (!navigator.onLine) return;
+  try {
+    const { data, error } = await sb.rpc('listar_meus_contatos');
+    if (error) throw error;
+    gravar(CHAVES.contatos, data || []);
+    atualizarContador();
+    if (estado.telaAtual === 'contatos') renderizarContatos();
+  } catch (e) { /* offline ou sessão expirada: o cache continua valendo */ }
+}
+
+function renderizarContatos() {
+  const termo = $('#busca').value.trim().toLowerCase();
+  const contatos = ler(CHAVES.contatos, []);
+  const fila = ler(CHAVES.fila, []);
+  const falhas = ler(CHAVES.falhas, []);
+
+  const avisos = [];
+  if (fila.length)   avisos.push(fila.length + ' awaiting sync.');
+  if (falhas.length) avisos.push(falhas.length + ' could not be saved: ' +
+                                 falhas.map(f => f.codigo).join(', ') + '.');
+  mostrarAviso('#contatos-aviso', avisos.join(' '), falhas.length ? 'erro' : 'atencao');
+
+  /* codigo_curto entra também no item pendente: é ele que reabre
+     o perfil no toque, e não faz sentido a linha ser clicável só
+     depois de sincronizar. */
+  const pendentes = fila.map(f => ({
+    aluno_id: 'fila:' + f.codigo,
+    codigo_curto: f.codigo,
+    nome: f.nome || 'Badge ' + String(f.codigo).slice(0, 6).toUpperCase(),
+    nota: f.nota, comentario: f.comentario, salvo_em: f.em, pendente: true
+  }));
+
+  const todos = pendentes.concat(contatos)
+    .filter(c => !termo || String(c.nome || '').toLowerCase().includes(termo));
+
+  if (!todos.length) {
+    $('#lista-contatos').innerHTML =
+      '<p class="vazio">' + (termo ? 'No contacts match that name.' : 'No contacts saved yet.') + '</p>';
+    return;
+  }
+
+  $('#lista-contatos').innerHTML = todos.map(c => {
+    const detalhes = [c.turma, c.projeto].filter(Boolean).join(' · ');
+    const contato  = [c.email, c.telefone].filter(Boolean).join(' · ');
+    const codigo   = c.codigo_curto || '';
+    return '<div class="item-contato" role="button" tabindex="0" data-codigo="' + escapar(codigo) + '">' +
+      '<div class="corpo">' +
+        '<h3>' + escapar(c.nome) + (c.pendente ? ' <span class="selo pendente">pending</span>' : '') + '</h3>' +
+        (detalhes ? '<div class="meta">' + escapar(detalhes) + '</div>' : '') +
+        (contato  ? '<div class="meta">' + escapar(contato)  + '</div>' : '') +
+        (c.nota ? '<div class="meta">Rating ' + escapar(c.nota) + '/5</div>' : '') +
+        (c.comentario ? '<div class="meta">“' + escapar(c.comentario) + '”</div>' : '') +
+      '</div>' +
+      (codigo ? '<span class="seta" aria-hidden="true">›</span>' : '') +
+    '</div>';
+  }).join('');
+
+  /* Reabre o perfil pelo código curto — o mesmo caminho do scan,
+     então nota e comentário já vêm preenchidos e podem ser
+     corrigidos. Contato sem código não abre: seria uma linha que
+     responde ao toque com uma tela de erro. */
+  $('#lista-contatos').querySelectorAll('[data-codigo]').forEach(el => {
+    const codigo = el.dataset.codigo;
+    if (!codigo) return;
+    const abrir = () => abrirPerfil(codigo, 'contatos');
+    el.addEventListener('click', abrir);
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abrir(); }
+    });
+  });
+}
+
+$('#busca').addEventListener('input', renderizarContatos);
+
+function atualizarContador() {
+  const contatos = ler(CHAVES.contatos, []);
+  const codigos = new Set(contatos.map(c => c.codigo_curto).filter(Boolean));
+  // Item da fila que só atualiza um contato já salvo não conta duas vezes.
+  const novosNaFila = ler(CHAVES.fila, [])
+    .filter(f => !codigos.has(String(f.codigo).toUpperCase())).length;
+  $('#contador-salvos').textContent = contatos.length + novosNaFila;
+}
+
+/* ============================================================
+   INICIALIZAÇÃO
+   ============================================================ */
+(async function iniciar() {
+  atualizarRede();
+  atualizarContador();
+
+  // Sessão persiste em localStorage: o avaliador loga uma vez no dia.
+  const { data } = await sb.auth.getSession();
+  if (!data || !data.session) {
+    await irPara('login');
+    return;
+  }
+
+  await entrar();
+
+  // O QR aponta para .../#/p/<token>. Se o avaliador ler o crachá
+  // pelo app de câmera do celular em vez do scanner interno, cai
+  // aqui já logado — abre o perfil direto.
+  const doHash = location.hash.match(/#\/p\/([A-Za-z0-9_-]+)/);
+  if (doHash) {
+    history.replaceState(null, '', location.pathname + location.search);
+    abrirPerfil(doHash[1]);
+  }
+})();
+
+// Service worker: mantém o app abrindo mesmo com o Wi-Fi do ginásio
+// fora do ar. Sem ele, um reload no meio do evento dá tela branca.
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

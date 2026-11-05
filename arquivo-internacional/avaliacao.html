@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10233f">
+<title>Feedback Survey · Career Day – Alfa University Fair</title>
+<!-- URL e chave anon do projeto: copie config.exemplo.js para config.js -->
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+
+<style>
+/* ============================================================
+   Mesma identidade do e-mail de agradecimento: fundo cinza-azulado,
+   cartão branco de 700px, marinho, vermelho e âmbar da marca. As
+   cores estão copiadas de lá para as duas peças chegarem juntas ao
+   mesmo destinatário sem parecerem de projetos diferentes.
+   ============================================================ */
+  :root {
+    --marinho:#10233f; --marinho-2:#16213f; --azul:#1f6fc0;
+    --vermelho:#c8102e; --ambar:#f5b52a; --ambar-fundo:#fdf3dd;
+    --areia:#faf6ee; --texto:#2c3a52; --cinza:#5c6b80;
+    --linha:#dfe5ec; --fundo:#eef1f5;
+
+    /* Quanto do topo da arte é mostrado. A imagem do e-mail traz,
+       embaixo, uma tarja vermelha escrita "Nosso agradecimento às
+       universidades participantes" — texto daquela peça, não desta.
+       0.66 corta a tarja e mantém logo, data, olho e título.
+       Aumente para mostrar mais da arte; diminua para cortar mais. */
+    --topo-visivel:0.66;
+  }
+
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--fundo); color:var(--texto);
+         font:16px/1.6 'Poppins','Segoe UI',Arial,Helvetica,sans-serif;
+         -webkit-text-size-adjust:100%; }
+
+  .folha { max-width:700px; margin:0 auto; background:#fff;
+           box-shadow:0 2px 18px rgba(16,35,63,.08); }
+  .corpo { padding:30px 40px 44px; }
+
+  /* ---- topo ----
+     A arte é 1400x600. O invólucro usa padding-bottom em vez de
+     altura fixa para o recorte acompanhar a largura da tela. */
+  .topo { position:relative; width:100%; overflow:hidden; line-height:0;
+          padding-bottom:28.3%;
+          padding-bottom:calc(600 / 1400 * var(--topo-visivel) * 100%); }
+  .topo img { position:absolute; top:0; left:0; width:100%; height:auto; border:0; }
+
+  .faixa { background:var(--vermelho); color:#fff; text-align:center;
+           padding:15px 24px; }
+  .faixa .en { display:block; font-size:15.5px; font-weight:700; letter-spacing:.2px; }
+  .faixa .pt { display:block; font-size:14px; font-weight:700; opacity:.92; margin-top:2px; }
+
+  .rodape-arte { display:block; width:100%; height:auto; border:0; }
+
+  /* ---- abertura ---- */
+  .abertura { background:var(--areia); border-left:4px solid var(--vermelho);
+              padding:18px 22px; margin-bottom:26px; }
+  .abertura p { margin:0; font-size:13.5px; line-height:1.7; }
+  .abertura p + p { margin-top:10px; padding-top:10px; border-top:1px solid #efe7d8; }
+
+  /* ---- progresso e estágio ---- */
+  .progresso { margin:0 0 8px; }
+  .trilha { height:8px; background:#e4e9f0; border-radius:99px; overflow:hidden;
+            display:flex; gap:2px; }
+  .trilha span { flex:1; background:#e4e9f0; transition:background .25s ease; }
+  .trilha span.feito { background:var(--vermelho); }
+  .trilha span.atual { background:var(--marinho); }
+
+  .estagio { margin:20px 0 22px; padding:16px 20px; background:var(--marinho);
+             color:#fff; }
+  .estagio .conta { display:block; font-size:10.5px; letter-spacing:2.5px;
+                    text-transform:uppercase; color:var(--ambar); font-weight:700; }
+  .estagio .en { display:block; font-size:16px; font-weight:700; margin-top:6px; }
+  .estagio .pt { display:block; font-size:13.5px; font-weight:700; color:#dbe6f2; }
+
+  /* ---- pergunta ---- */
+  .pergunta { border:1px solid var(--linha); border-top:3px solid var(--marinho);
+              margin-bottom:18px; }
+  .pergunta > .cabeca { padding:16px 20px 14px; background:#fff;
+                        border-bottom:1px solid var(--linha); }
+  .pergunta .num { display:inline-block; min-width:34px; padding:3px 9px;
+                   background:var(--marinho); color:#fff; font-size:12.5px;
+                   font-weight:700; text-align:center; margin-bottom:9px; }
+  .pergunta .en { display:block; font-size:15px; font-weight:700; color:var(--marinho);
+                  line-height:1.45; }
+  .pergunta .pt { display:block; font-size:14px; font-weight:700; color:var(--cinza);
+                  line-height:1.45; margin-top:3px; }
+  .pergunta .ajuda { margin:10px 0 0; font-size:12px; line-height:1.6; color:var(--cinza); }
+  .pergunta .ajuda b { color:var(--texto); }
+  .pergunta > .miolo { padding:16px 20px 20px; background:#fcfdfe; }
+  .rodape-nota { margin:12px 0 0; font-size:11.5px; color:var(--cinza); text-align:center; }
+
+  /* ---- item numerado dentro da matriz ----
+     Cada linha é uma pergunta com número próprio (3.1, 3.2 …) e
+     moldura, para não virar uma parede de escalas iguais. */
+  .item { border:1px solid var(--linha); background:#fff; padding:13px 15px 15px;
+          margin-bottom:12px; }
+  .item:last-child { margin-bottom:0; }
+  .item .rot { display:flex; align-items:flex-start; margin-bottom:11px; }
+  .item .subnum { display:inline-block; min-width:32px; padding:2px 8px;
+                  background:var(--ambar-fundo); color:#9a6b06; font-size:11.5px;
+                  font-weight:700; text-align:center; margin-right:9px;
+                  flex:none; }
+  /* Inglês em cima, português embaixo: em linha corrida os dois
+     idiomas grudam e o olho não sabe onde um acaba. */
+  .item .en { display:block; font-size:14px; font-weight:700; color:var(--marinho);
+              line-height:1.35; }
+  .item .pt { display:block; font-size:13px; font-weight:700; color:var(--cinza);
+              line-height:1.35; }
+  .item .par { flex:1 1 auto; min-width:0; }
+
+  /* ---- escala ----
+     Botão de 62px de altura: alvo de toque confortável no celular,
+     onde rádio nativo (20px) faz errar a linha. */
+  .escala { display:grid; grid-template-columns:repeat(5,1fr); gap:7px; }
+  .escala button { min-height:70px; background:#fff;
+                   border:1.5px solid var(--linha); border-radius:6px;
+                   font:inherit; color:var(--marinho); line-height:1.2;
+                   padding:8px 5px; cursor:pointer; transition:all .15s ease; }
+  .escala button .n { display:block; font-size:17px; font-weight:700; }
+  .escala button .le { display:block; font-size:11.5px; font-weight:700; margin-top:3px; }
+  .escala button .lp { display:block; font-size:11px; font-weight:700; color:var(--texto); }
+  .escala button:hover { border-color:var(--marinho); }
+  .escala button[aria-pressed="true"] { background:var(--marinho); border-color:var(--marinho);
+                                        color:#fff; }
+  .escala button[aria-pressed="true"] .lp { color:#c3d3e6; }
+
+  .escala.nps { grid-template-columns:repeat(11,1fr); }
+  .escala.nps button { min-height:52px; }
+  .escala.nps button .n { font-size:16px; }
+
+  textarea { font:inherit; font-size:16px; width:100%; min-height:104px;
+             padding:12px 14px; border:1.5px solid var(--linha); border-radius:6px;
+             background:#fff; color:var(--texto); resize:vertical; }
+  textarea:focus { outline:none; border-color:var(--marinho);
+                   box-shadow:0 0 0 3px rgba(16,35,63,.08); }
+
+  .caixa { display:flex; gap:12px; align-items:flex-start; padding:12px 14px;
+           border:1px solid var(--linha); background:#fff; margin-bottom:9px;
+           cursor:pointer; }
+  .caixa:last-child { margin-bottom:0; }
+  .caixa input { width:20px; height:20px; margin:2px 0 0; flex:none;
+                 accent-color:var(--marinho); }
+  .caixa .en { display:block; font-size:13.5px; font-weight:700; color:var(--marinho); }
+  .caixa .pt { display:block; font-size:12.5px; font-weight:700; color:var(--cinza); }
+
+  /* ---- navegação ---- */
+  .navegacao { display:flex; gap:12px; margin-top:24px; }
+  .navegacao button { flex:1; min-height:56px; font:inherit; font-size:15px;
+                      font-weight:700; border-radius:6px; cursor:pointer;
+                      padding:8px 10px; line-height:1.25; }
+  .voltar { background:#fff; border:1.5px solid var(--linha); color:var(--cinza); }
+  .voltar:disabled { opacity:.4; cursor:default; }
+  .avancar { background:var(--marinho); border:0; color:#fff; }
+  .avancar:active { background:var(--marinho-2); }
+  .enviar { background:var(--vermelho); border:0; color:#fff; }
+  .enviar:disabled { background:#8c1020; opacity:.8; cursor:default; }
+  .navegacao .pt2 { display:block; font-size:11.5px; font-weight:700; opacity:.8; }
+
+  .aviso { padding:14px 18px; margin:0 0 20px; font-size:13.5px; line-height:1.6;
+           font-weight:700; border-left:4px solid; }
+  .aviso.erro { background:#fdecea; border-color:var(--vermelho); color:#8c1020; }
+  .aviso.info { background:var(--ambar-fundo); border-color:var(--ambar); color:#9a6b06; }
+  .aviso:empty { display:none; }
+
+  .anonima { margin:0 0 26px; padding:13px 18px; background:#f2f6fb;
+             border-left:4px solid var(--azul); font-size:12.5px; line-height:1.65; }
+  .anonima .en { display:block; font-weight:700; color:var(--marinho); }
+  .anonima .pt { display:block; font-weight:700; color:var(--cinza); margin-top:3px; }
+
+  .oculto { display:none !important; }
+
+  .pronto { text-align:center; padding:46px 10px; }
+  .pronto .marca-ok { font-size:52px; line-height:1; color:var(--vermelho); }
+  .pronto .en { display:block; font-size:20px; font-weight:700; color:var(--marinho);
+                margin-top:14px; }
+  .pronto .pt { display:block; font-size:16px; font-weight:700; color:var(--cinza);
+                margin-top:4px; }
+  .pronto .detalhe { margin-top:16px; font-size:13px; font-weight:700; color:var(--cinza); }
+
+  .assinatura { background:var(--areia); padding:20px 40px; font-size:12.5px;
+                line-height:1.6; color:var(--cinza); }
+  .assinatura b { color:var(--marinho); }
+
+  @media (max-width:600px) {
+    .corpo { padding:22px 18px 34px; }
+    .assinatura { padding:18px; }
+    .escala { grid-template-columns:repeat(2,1fr); }
+    .escala.nps { grid-template-columns:repeat(6,1fr); }
+    .navegacao { flex-direction:column-reverse; }
+  }
+</style>
+</head>
+<body>
+<div class="folha">
+
+  <div class="topo"><img src="topo-feira.jpg" alt="Career Day · Alfa University Fair"></div>
+
+  <div class="faixa">
+    <span class="en">Institutional Feedback Survey</span>
+    <span class="pt">Pesquisa Institucional de Feedback</span>
+  </div>
+
+  <div class="corpo">
+
+    <div class="abertura">
+      <p><b>Thank you for participating in the Alfacem Global Academy International
+        University Fair. This survey is completely anonymous. Your feedback will
+        help us evaluate this edition and improve future events.</b></p>
+      <p lang="pt-BR"><b>Agradecemos por participar da International University Fair da
+        Alfacem Global Academy. Esta pesquisa é totalmente anônima. Seu feedback nos
+        ajudará a avaliar esta edição e aprimorar os próximos eventos.</b></p>
+    </div>
+
+    <noscript>
+      <p class="aviso erro">This survey needs JavaScript enabled to load. Please open
+        the link in another browser. /
+        Esta pesquisa precisa de JavaScript para carregar. Abra o link em outro navegador.</p>
+    </noscript>
+
+    <div id="aviso" class="aviso"></div>
+
+    <p class="aviso info" id="carregando">Loading the survey… / Carregando a pesquisa…</p>
+
+    <!-- ============================================================
+         O formulário só aparece depois que o convite é reconhecido.
+         ============================================================ -->
+    <div id="formulario" class="oculto">
+
+      <p class="anonima">
+        <span class="en">Answers are stored with no link to who submitted them.</span>
+        <span class="pt">As respostas são gravadas sem qualquer vínculo com quem respondeu.</span>
+      </p>
+
+      <!-- ---- estágios ----
+           Dez questões numa rolagem só viravam dois metros de tela no
+           celular. Divididas em seis estágios, cada tela cabe de uma
+           vez, e a barra segmentada mostra quantos faltam. -->
+      <div class="progresso"><div class="trilha" id="trilha"></div></div>
+
+      <div class="estagio">
+        <span class="conta" id="passo-conta"></span>
+        <span class="en" id="passo-en"></span>
+        <span class="pt" id="passo-pt"></span>
+      </div>
+
+      <div id="perguntas"></div>
+
+      <div class="navegacao">
+        <button type="button" class="voltar" id="voltar">← Back<span class="pt2">Voltar</span></button>
+        <button type="button" class="avancar" id="avancar">Next →<span class="pt2">Continuar</span></button>
+        <button type="button" class="enviar oculto" id="enviar">Submit answers<span class="pt2">Enviar respostas</span></button>
+      </div>
+    </div>
+
+    <!-- ---- fim ---- -->
+    <div id="pronto" class="pronto oculto">
+      <div class="marca-ok">✓</div>
+      <span class="en" id="pronto-en">Thank you!</span>
+      <span class="pt" id="pronto-pt">Obrigado!</span>
+      <p class="detalhe" id="pronto-detalhe">Your feedback has been recorded.<br>
+        Sua avaliação foi registrada.</p>
+    </div>
+
+  </div>
+
+  <div class="assinatura">
+    <b>Rede Alfacem Global Academy</b> · Career Day – Alfa University Fair<br>
+    Rio de Janeiro, Brasil · 2026
+  </div>
+
+  <img class="rodape-arte" src="rodape-feira.jpg" alt="Alfacem Global Academy">
+
+</div>
+
+<script>
+const SUPABASE_URL      = window.CONFIG.SUPABASE_URL;
+const SUPABASE_ANON_KEY = window.CONFIG.SUPABASE_ANON_KEY;
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+});
+
+const $ = s => document.querySelector(s);
+
+/* O token vem no endereço do convite, e a página aceita as duas
+   formas: .../avaliacao#TOKEN e .../avaliacao?t=TOKEN
+
+   O hash é a forma preferida: o que vem depois do # não é enviado
+   ao servidor nem entra em log de acesso de CDN. É por ele que os
+   links são gerados.
+
+   O ?t= existe como rede de segurança. Fragmento é coisa que só o
+   navegador carrega: some em redirecionamento mal-comportado, em
+   reescrita de link de antivírus de e-mail e em cliente que "limpa"
+   endereço antes de abrir. Já aconteceu aqui — um link com .html
+   caiu num 307 do Cloudflare para a URL sem extensão e a tela abriu
+   sem token. Query string, essa o servidor carrega no Location. */
+const TOKEN = (() => {
+  /* Hash malformado (%zz colado por um cliente de e-mail) faz
+     decodeURIComponent lançar URIError. Nu, num caminho de
+     inicialização, isso mataria o script antes de qualquer
+     listener e a página ficaria branca e muda. */
+  const decodificar = t => { try { return decodeURIComponent(t); } catch (e) { return t; } };
+  const doHash = decodificar((location.hash || '').replace(/^#/, '').trim());
+  if (doHash) return doHash;
+  return (new URLSearchParams(location.search).get('t') || '').trim();
+})();
+
+const respostas = { q10_interesses: [] };
+
+/* Marca de "já respondi", por código: se o código do link geral for
+   trocado para uma segunda rodada, a marca velha não bloqueia a nova. */
+const MARCA_LOCAL = 'pesquisa-respondida:' + TOKEN.toUpperCase().replace(/[^0-9A-Z]/g, '');
+
+/* Ler localStorage também lança quando o armazenamento está
+   bloqueado — política de cookies, navegação privada em iOS antigo,
+   navegador corporativo. Só o gravar estava protegido; sem o par,
+   a pesquisa inteira morria na abertura. */
+const marcouAqui = () => { try { return !!localStorage.getItem(MARCA_LOCAL); } catch (e) { return false; } };
+const marcarAqui = () => { try { localStorage.setItem(MARCA_LOCAL, '1'); } catch (e) { /* modo privado */ } };
+
+/* O "carregando" some no primeiro desfecho, seja ele qual for.
+   Sem isso, uma chamada que nunca volta deixa a pessoa olhando
+   para uma tela que não diz nada. */
+function pronto() {
+  const c = $('#carregando');
+  if (c) c.remove();
+}
+
+function avisar(txt, tipo) {
+  pronto();
+  $('#aviso').textContent = txt || '';
+  $('#aviso').className = 'aviso' + (txt ? ' ' + (tipo || 'erro') : '');
+  if (txt) $('#aviso').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+const esc = t => String(t == null ? '' : t)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/* ============================================================
+   As dez perguntas do formulário em papel
+
+   Inglês primeiro, português depois, os dois em negrito: quem
+   recebe é representante de universidade, e a maioria lê inglês.
+
+   Não há mais opção "N/A". Quem não quiser responder um item deixa
+   em branco — o efeito no cálculo é o mesmo (fica fora da média),
+   e uma opção a menos é uma decisão a menos por linha.
+   ============================================================ */
+const ESCALA5 = [
+  [1, 'Very poor',    'Muito insatisfatório'],
+  [2, 'Poor',         'Insatisfatório'],
+  [3, 'Satisfactory', 'Satisfatório'],
+  [4, 'Very good',    'Muito bom'],
+  [5, 'Excellent',    'Excelente']
+];
+
+const PASSOS = [
+  ['Your experience',            'Sua experiência'],
+  ['Organization & venue',       'Organização e infraestrutura'],
+  ['Our students',               'Nossos alunos'],
+  ['Event platform',             'Plataforma do evento'],
+  ['Value & next edition',       'Valor e próxima edição'],
+  ['Comments & collaboration',   'Comentários e colaboração']
+];
+
+const PERGUNTAS = [
+  { passo: 0, num: '1', tipo: 'escala', chave: 'q1_geral',
+    en: 'Overall, how would you rate your experience at the fair?',
+    pt: 'De maneira geral, como você avaliaria sua experiência na feira?',
+    ajuda: '<b>Required.</b> / <b>Obrigatória.</b>' },
+
+  { passo: 0, num: '2', tipo: 'escala', chave: 'q2_pre_evento',
+    en: 'How would you rate the pre-event communication, information and support from our team?',
+    pt: 'Como você avaliaria a comunicação, as informações e o suporte da nossa equipe antes do evento?' },
+
+  { passo: 1, num: '3', tipo: 'matriz',
+    en: "How would you rate the event's organization and infrastructure?",
+    pt: 'Como você avaliaria a organização e a infraestrutura do evento?',
+    itens: [
+      ['q3_chegada',        'Arrival & check-in',       'Chegada e credenciamento'],
+      ['q3_estande_espaco', 'Booth / table space',      'Espaço do estande/mesa'],
+      ['q3_estande_local',  'Booth location',           'Localização do estande'],
+      ['q3_sinalizacao',    'Signage & wayfinding',     'Sinalização e orientação'],
+      ['q3_fluxo',          'Visitor flow',             'Fluxo de visitantes'],
+      ['q3_infra_tecnica',  'Technical infrastructure', 'Infraestrutura técnica'],
+      ['q3_suporte',        'Team support',             'Suporte da equipe'],
+      ['q3_organizacao',    'Overall organization',     'Organização geral']
+    ] },
+
+  { passo: 2, num: '4', tipo: 'matriz',
+    en: 'How would you rate the quality of your interactions with Alfacem Global Academy students?',
+    pt: 'Como você avaliaria a qualidade das suas interações com os alunos da Alfacem Global Academy?',
+    itens: [
+      ['q4_interesse',   'Interest & engagement',     'Interesse e engajamento'],
+      ['q4_perguntas',   'Quality of questions',      'Qualidade das perguntas'],
+      ['q4_confianca',   'Confidence & initiative',   'Confiança e iniciativa'],
+      ['q4_consciencia', 'Academic / career awareness', 'Conhecimento acadêmico e profissional'],
+      ['q4_geral',       'Overall interaction',       'Interação geral']
+    ] },
+
+  { passo: 2, num: '5', tipo: 'escala', chave: 'q5_ingles',
+    en: "How would you rate our students' ability to communicate in English?",
+    pt: 'Como você avaliaria a capacidade dos nossos alunos de se comunicar em inglês?',
+    ajuda: '<b>Consider confidence, comprehension and ability to hold a conversation.</b><br>' +
+           '<b>Considere confiança, compreensão e capacidade de manter uma conversa.</b>',
+    rotulos: [
+      [1, 'Very limited', 'Muito limitada'],
+      [2, 'Limited',      'Limitada'],
+      [3, 'Satisfactory', 'Satisfatória'],
+      [4, 'Very good',    'Muito boa'],
+      [5, 'Excellent',    'Excelente']
+    ] },
+
+  { passo: 3, num: '6', tipo: 'matriz',
+    en: 'How would you rate the event platform and its effectiveness for lead capture?',
+    pt: 'Como você avaliaria a plataforma do evento e sua eficiência para a captação de leads?',
+    itens: [
+      ['q6_acesso',         'Ease of access',            'Facilidade de acesso'],
+      ['q6_uso',            'Ease of use',               'Facilidade de utilização'],
+      ['q6_captura',        'Lead capture process',      'Processo de captação de leads'],
+      ['q6_confiabilidade', 'Reliability',               'Confiabilidade'],
+      ['q6_utilidade',      'Usefulness for recruitment', 'Utilidade para recrutamento']
+    ] },
+
+  { passo: 4, num: '7', tipo: 'escala', chave: 'q7_valor',
+    en: 'How valuable was participating in the fair for your institution?',
+    pt: 'Qual foi o valor da participação na feira para sua instituição?',
+    ajuda: '<b>Consider student engagement, visibility, networking and recruitment.</b><br>' +
+           '<b>Considere interação com alunos, visibilidade, networking e recrutamento.</b>',
+    rotulos: [
+      [1, 'Very low value',  'Valor muito baixo'],
+      [2, 'Low value',       'Valor baixo'],
+      [3, 'Satisfactory value', 'Valor satisfatório'],
+      [4, 'High value',      'Alto valor'],
+      [5, 'Excellent value', 'Excelente valor']
+    ] },
+
+  { passo: 4, num: '8', tipo: 'nps', chave: 'q8_voltaria',
+    en: 'How likely is your institution to participate in the next edition?',
+    pt: 'Qual a probabilidade de sua instituição participar da próxima edição?' },
+
+  { passo: 5, num: '9', tipo: 'texto',
+    en: 'What was the strongest aspect of the event, and what is the most important improvement for the next edition?',
+    pt: 'Qual foi o principal ponto positivo do evento e qual a melhoria mais importante para a próxima edição?',
+    ajuda: '<b>Candid feedback is welcome.</b> / <b>Feedback sincero é bem-vindo.</b>',
+    campos: [
+      ['q9_ponto_forte', '9.1', 'Strongest aspect',            'Principal ponto positivo'],
+      ['q9_melhoria',    '9.2', 'Most important improvement',  'Melhoria mais importante']
+    ] },
+
+  { passo: 5, num: '10', tipo: 'caixas', chave: 'q10_interesses',
+    en: 'Would your institution be interested in future collaboration opportunities?',
+    pt: 'Sua instituição teria interesse em futuras oportunidades de colaboração?',
+    ajuda: '<b>Select as many as you like.</b> / <b>Marque quantas quiser.</b>',
+    opcoes: [
+      ['futuras-edicoes', 'Future editions of the fair',        'Futuras edições da feira'],
+      ['visitas',         'Institutional or campus visits',     'Visitas institucionais ou ao campus'],
+      ['apresentacoes',   'Presentations for students',         'Apresentações para alunos'],
+      ['workshops',       'Workshops or guest lectures',        'Workshops ou palestras'],
+      ['webinars',        'Webinars',                           'Webinars'],
+      ['processos',       'Admissions information sessions',    'Sessões sobre processos seletivos'],
+      ['bolsas',          'Scholarships and financial aid',     'Sessões sobre bolsas e auxílio'],
+      ['familias',        'Information sessions for families',  'Sessões informativas para famílias'],
+      ['counselors',      'Meetings with counselors',           'Encontros com counselors'],
+      ['parcerias',       'Other institutional partnerships',   'Outras parcerias institucionais'],
+      ['nao-agora',       'Not at this time',                   'Não neste momento']
+    ] }
+];
+
+/* ---- desenho ---- */
+
+function botoesEscala(chave, rotulos, classe) {
+  const linhas = (rotulos || ESCALA5).map(([n, en, pt]) =>
+    `<button type="button" data-chave="${chave}" data-valor="${n}" aria-pressed="false">
+       <span class="n">${n}</span>
+       <span class="le">${esc(en)}</span>
+       <span class="lp">${esc(pt)}</span>
+     </button>`).join('');
+
+  return `<div class="escala${classe ? ' ' + classe : ''}">${linhas}</div>`;
+}
+
+function desenhar() {
+  $('#perguntas').innerHTML = PERGUNTAS.map(p => {
+    let corpo = '';
+
+    if (p.tipo === 'escala') {
+      corpo = botoesEscala(p.chave, p.rotulos);
+
+    } else if (p.tipo === 'matriz') {
+      /* Cada linha ganha número próprio — 3.1, 3.2 … — para dar
+         referência ao falar de um item específico depois. */
+      corpo = p.itens.map(([chave, en, pt], i) => `
+        <div class="item">
+          <div class="rot">
+            <span class="subnum">${p.num}.${i + 1}</span><span class="par"><span class="en">${esc(en)}</span>
+            <span class="pt">${esc(pt)}</span></span>
+          </div>
+          ${botoesEscala(chave)}
+        </div>`).join('');
+
+    } else if (p.tipo === 'nps') {
+      /* 0 a 10 sem rótulo por baixo de cada número: onze botões com
+         legenda viram parede de texto no celular. As pontas são
+         explicadas embaixo. */
+      corpo = '<div class="escala nps">' +
+        Array.from({ length: 11 }, (_, n) =>
+          `<button type="button" data-chave="${p.chave}" data-valor="${n}" aria-pressed="false">
+             <span class="n">${n}</span></button>`).join('') +
+        '</div><p class="rodape-nota"><b>0 = not at all likely · 10 = extremely likely</b><br>' +
+        '<b>0 = nenhuma probabilidade · 10 = extremamente provável</b></p>';
+
+    } else if (p.tipo === 'texto') {
+      corpo = p.campos.map(([chave, num, en, pt]) => `
+        <div class="item">
+          <div class="rot">
+            <span class="subnum">${esc(num)}</span><span class="par"><span class="en">${esc(en)}</span>
+            <span class="pt">${esc(pt)}</span></span>
+          </div>
+          <textarea data-campo="${chave}"></textarea>
+        </div>`).join('');
+
+    } else if (p.tipo === 'caixas') {
+      corpo = p.opcoes.map(([valor, en, pt]) => `
+        <label class="caixa">
+          <input type="checkbox" data-interesse="${esc(valor)}">
+          <span><span class="en">${esc(en)}</span><span class="pt">${esc(pt)}</span></span>
+        </label>`).join('');
+    }
+
+    /* Todas as perguntas são desenhadas de uma vez e escondidas por
+       estágio, em vez de redesenhadas a cada avanço. Assim o que já
+       foi marcado continua marcado ao voltar, sem precisar guardar e
+       repor estado de tela — o DOM é a memória. */
+    return `<div class="pergunta" data-passo="${p.passo}">
+      <div class="cabeca">
+        <span class="num">${esc(p.num)}</span>
+        <span class="en">${esc(p.en)}</span>
+        <span class="pt">${esc(p.pt)}</span>
+        ${p.ajuda ? `<p class="ajuda">${p.ajuda}</p>` : ''}
+      </div>
+      <div class="miolo">${corpo}</div>
+    </div>`;
+  }).join('');
+
+  $('#trilha').innerHTML = PASSOS.map(() => '<span></span>').join('');
+
+  /* ---- cliques ---- */
+  $('#perguntas').addEventListener('click', ev => {
+    const b = ev.target.closest('button[data-chave]');
+    if (!b) return;
+
+    const chave = b.dataset.chave;
+    const valor = Number(b.dataset.valor);
+
+    /* Clicar no que já está marcado desmarca — mesma regra da nota
+       do app de captura, e a única forma de voltar atrás numa
+       pergunta que não é obrigatória. */
+    respostas[chave] = (respostas[chave] === valor) ? undefined : valor;
+
+    b.parentElement.querySelectorAll('button[data-chave="' + chave + '"]').forEach(x =>
+      x.setAttribute('aria-pressed',
+        String(respostas[chave] !== undefined && Number(x.dataset.valor) === respostas[chave])));
+  });
+
+  $('#perguntas').addEventListener('input', ev => {
+    if (ev.target.dataset.campo) respostas[ev.target.dataset.campo] = ev.target.value;
+  });
+
+  $('#perguntas').addEventListener('change', ev => {
+    const c = ev.target.dataset.interesse;
+    if (!c) return;
+    const lista = new Set(respostas.q10_interesses);
+    ev.target.checked ? lista.add(c) : lista.delete(c);
+    respostas.q10_interesses = [...lista];
+  });
+}
+
+/* ============================================================
+   Navegação por estágios
+   ============================================================ */
+let passo = 0;
+
+function mostrarPasso(novo) {
+  passo = Math.max(0, Math.min(PASSOS.length - 1, novo));
+
+  document.querySelectorAll('.pergunta').forEach(el => {
+    el.classList.toggle('oculto', Number(el.dataset.passo) !== passo);
+  });
+
+  const ultimo = passo === PASSOS.length - 1;
+  $('#voltar').disabled = passo === 0;
+  $('#avancar').classList.toggle('oculto', ultimo);
+  $('#enviar').classList.toggle('oculto', !ultimo);
+
+  $('#trilha').querySelectorAll('span').forEach((s, i) => {
+    s.className = i < passo ? 'feito' : (i === passo ? 'atual' : '');
+  });
+
+  $('#passo-conta').textContent = `Stage ${passo + 1} of ${PASSOS.length} · Etapa ${passo + 1} de ${PASSOS.length}`;
+  $('#passo-en').textContent = PASSOS[passo][0];
+  $('#passo-pt').textContent = PASSOS[passo][1];
+
+  /* Volta ao topo a cada troca. Sem isso, quem estava no fim de uma
+     tela longa cai no meio da próxima e acha que faltou conteúdo. */
+  /* A forma de dois argumentos funciona em tudo. O objeto com
+     behavior:'instant' só foi aceito a partir do Safari 15.4 e do
+     Chrome 97 — antes disso lança TypeError e derruba a troca de
+     etapa. */
+  window.scrollTo(0, 0);
+}
+
+$('#avancar').addEventListener('click', () => {
+  /* A pergunta 1 é a única obrigatória e mora no primeiro estágio:
+     travar aqui evita preencher seis telas para descobrir no fim
+     que faltou a primeira. */
+  if (passo === 0 && respostas.q1_geral === undefined) {
+    avisar('Please answer question 1 to continue. / Responda a pergunta 1 para continuar.');
+    return;
+  }
+  avisar('');
+  mostrarPasso(passo + 1);
+});
+
+$('#voltar').addEventListener('click', () => { avisar(''); mostrarPasso(passo - 1); });
+
+/* ---- envio ---- */
+function agradecer(en, pt) {
+  pronto();
+  $('#formulario').classList.add('oculto');
+  $('#pronto').classList.remove('oculto');
+  if (en) {
+    $('#pronto-detalhe').innerHTML = esc(en) + '<br>' + esc(pt);
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+$('#enviar').addEventListener('click', async () => {
+  if (respostas.q1_geral === undefined) {
+    avisar('Please answer question 1 before submitting. / Responda a pergunta 1 antes de enviar.');
+    mostrarPasso(0);
+    return;
+  }
+
+  const botao = $('#enviar');
+  botao.disabled = true;
+  botao.innerHTML = 'Sending…<span class="pt2">Enviando…</span>';
+  avisar('');
+
+  try {
+    const { error } = await sb.rpc('registrar_avaliacao', {
+      p_token: TOKEN, p_dados: respostas
+    });
+    if (error) throw error;
+
+    marcarAqui();
+    agradecer();
+
+  } catch (e) {
+    const msg = String(e && e.message || e);
+
+    /* `ja_respondeu` não é falha: é a resposta anterior que chegou
+       primeiro — duas abas abertas, ou um toque duplo no envio.
+       Agradecer é mais honesto do que mandar tentar de novo, já que
+       a resposta está gravada. */
+    if (/ja_respondeu/.test(msg)) { agradecer(); return; }
+
+    /* Prazo encerrado entre abrir e enviar: mandar "tente de novo"
+       seria um laço sem fim, porque nunca mais vai passar. */
+    if (/pesquisa_encerrada/.test(msg)) {
+      avisar('This survey has just closed. Thank you for your interest! / ' +
+             'O prazo desta pesquisa acabou de encerrar. Obrigado pelo interesse!', 'info');
+      botao.innerHTML = 'Survey closed<span class="pt2">Pesquisa encerrada</span>';
+      return;
+    }
+
+    if (/resposta_vazia/.test(msg)) {
+      avisar('Please answer question 1 before submitting. / ' +
+             'Responda a pergunta 1 antes de enviar.');
+      mostrarPasso(0);
+      botao.disabled = false;
+      botao.innerHTML = 'Submit answers<span class="pt2">Enviar respostas</span>';
+      return;
+    }
+
+    avisar(/convite_invalido/.test(msg)
+      ? 'This invitation is no longer valid. Please contact the organisers. / ' +
+        'Este convite não é mais válido. Fale com a organização.'
+      : 'Could not submit. Please try again in a moment. / ' +
+        'Não consegui enviar. Tente de novo em instantes.');
+    botao.disabled = false;
+    botao.innerHTML = 'Submit answers<span class="pt2">Enviar respostas</span>';
+  }
+});
+
+/* ---- abertura ---- */
+(async () => {
+  if (!TOKEN) {
+    avisar('Incomplete link: the part after # is missing. Copy the full link from the ' +
+           'email and paste it into the address bar. / Link incompleto: falta a parte ' +
+           'final do endereço, depois do #. Copie o link do e-mail inteiro e cole na ' +
+           'barra de endereço.');
+    return;
+  }
+
+  try {
+    const { data, error } = await sb.rpc('avaliacao_convite', { p_token: TOKEN });
+    if (error) throw error;
+
+    /* No link geral não há como o servidor saber que este navegador
+       já respondeu — o código é o mesmo para todos. A marca local
+       cobre o caso comum: recarregar, tocar duas vezes, voltar pelo
+       histórico. Contra quem quiser responder de novo de propósito
+       não há defesa, e nem deveria haver: é uma pesquisa de
+       satisfação, não uma eleição. */
+    if (data.geral && marcouAqui()) {
+      agradecer('You have already answered on this device.',
+                'Você já respondeu neste dispositivo.');
+      return;
+    }
+
+    /* Convite já usado: agradece e não abre o formulário. Não dá
+       para mostrar o que foi respondido antes — é isso que o
+       anonimato custa. Sem vínculo entre resposta e respondente,
+       nem o servidor sabe qual das linhas é desta pessoa. */
+    if (data.ja_respondeu) {
+      agradecer('This survey has already been answered with this invitation.',
+                'Esta pesquisa já foi respondida com este convite.');
+      return;
+    }
+
+    pronto();
+    desenhar();
+    mostrarPasso(0);
+    $('#formulario').classList.remove('oculto');
+
+  } catch (e) {
+    const msg = String(e && e.message || e);
+    avisar(
+      /pesquisa_encerrada/.test(msg)
+        ? 'This survey is now closed. Thank you for your interest! / ' +
+          'O prazo desta pesquisa foi encerrado. Obrigado pelo interesse!'
+      : /convite_invalido/.test(msg)
+        ? 'Invitation not found — please check the link from the email. / ' +
+          'Convite não encontrado. Confira o link do e-mail.'
+        : 'Could not load the survey. Please try again in a moment. / ' +
+          'Não consegui abrir a pesquisa agora. Tente de novo em instantes.',
+      /pesquisa_encerrada/.test(msg) ? 'info' : 'erro');
+  }
+})();
+</script>
+</body>
+</html>

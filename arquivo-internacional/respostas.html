@@ -1,0 +1,1110 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#10233f">
+<title>Respostas das pesquisas · Career Day</title>
+<!-- URL e chave anon do projeto: copie config.exemplo.js para config.js -->
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+
+<style>
+/* ============================================================
+   Tela de leitura para a direção. Vai ser aberta num notebook,
+   projetada numa reunião e às vezes impressa — por isso contraste
+   alto, nada de texto abaixo de 12px, e tudo que importa acima da
+   dobra.
+
+   Identidade do e-mail e das duas pesquisas.
+
+   SEMÂNTICA DE COR, fixa e única na tela:
+     marinho   = fato e estrutura
+     âmbar     = pendência (falta fazer) e elogio
+     vermelho  = o que pediram para consertar, e falha real
+     cinza     = "não dá para dizer"
+   "Não sei" nunca é vermelho: não é problema, e pintar de vermelho
+   ensina a sala a ignorar o vermelho.
+   ============================================================ */
+  :root {
+    --marinho:#10233f; --azul:#1f6fc0; --vermelho:#c8102e;
+    --ambar:#f5b52a; --ambar-fundo:#fdf3dd; --areia:#faf6ee;
+    --verde:#1e7a4a; --texto:#2c3a52; --cinza:#5c6b80;
+    --nulo:#c4ccd8; --linha:#dfe5ec; --fundo:#eef1f5;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--fundo); color:var(--texto);
+         font:16px/1.6 'Poppins','Segoe UI',Arial,Helvetica,sans-serif; }
+  .env { max-width:1000px; margin:0 auto; padding:0 20px 60px; }
+
+  header { background:var(--marinho); color:#fff; margin-bottom:24px; }
+  header .env { padding:20px; display:flex; flex-wrap:wrap;
+                align-items:baseline; justify-content:space-between; gap:12px; }
+  header .olho { display:block; font-size:10.5px; letter-spacing:2.5px;
+                 text-transform:uppercase; color:var(--ambar); font-weight:700; }
+  header h1 { margin:5px 0 0; font-size:21px; font-weight:700; }
+  header a { color:#fff; font-size:12.5px; }
+
+  /* ---- login ---- */
+  .acesso { max-width:420px; margin:60px auto; background:#fff;
+            border:1px solid var(--linha); border-top:3px solid var(--marinho);
+            padding:28px 26px 30px; }
+  .acesso h2 { margin:0 0 6px; font-size:18px; color:var(--marinho); }
+  .acesso p.sub { margin:0 0 20px; font-size:13.5px; color:var(--cinza); }
+  label { display:block; font-size:11.5px; font-weight:700; color:var(--cinza);
+          text-transform:uppercase; letter-spacing:.08em; margin:14px 0 6px; }
+  input { font:inherit; font-size:16px; width:100%; min-height:52px; padding:12px 14px;
+          border:1.5px solid var(--linha); border-radius:6px; background:#fff; }
+  input:focus { outline:none; border-color:var(--marinho); }
+  button { font:inherit; font-weight:700; border-radius:6px; cursor:pointer; }
+  .primario { width:100%; min-height:54px; margin-top:18px; font-size:15px;
+              background:var(--marinho); color:#fff; border:0; }
+  .primario:disabled { background:#9aa7b8; cursor:default; }
+  .msg { margin:14px 0 0; font-size:13.5px; font-weight:700; color:var(--cinza); }
+  .msg.erro { color:var(--vermelho); }
+  .msg:empty { display:none; }
+
+  /* ---- tira de pendência ---- */
+  .pendencia { background:var(--areia); border-left:6px solid var(--ambar);
+               padding:14px 18px; margin-bottom:18px; }
+  .pendencia b { display:block; font-size:13px; color:var(--marinho); }
+  .pendencia span { font-size:13.5px; }
+  .pendencia button { background:none; border:0; color:var(--azul); font-size:13.5px;
+                      padding:0 0 0 4px; text-decoration:underline; }
+
+  /* ---- abas ---- */
+  .abas { display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; }
+  .abas button { flex:1 1 220px; min-height:60px; background:#fff; color:var(--cinza);
+                 border:1.5px solid var(--linha); font-size:13px; padding:9px 12px;
+                 text-align:left; }
+  .abas button b { display:block; color:var(--marinho); font-size:15px; }
+  .abas button i { display:block; font-style:normal; font-size:11px; margin-top:2px; }
+  .abas button.zero i { color:#9a6b06; font-weight:700; }
+  .abas button[aria-selected="true"] { background:var(--marinho); border-color:var(--marinho);
+                                       color:#c3d3e6; }
+  .abas button[aria-selected="true"] b { color:#fff; }
+  .abas button[aria-selected="true"].zero i { color:var(--ambar); }
+
+  /* ---- faixa do veredito ----
+     As duas figuras têm o MESMO corpo de propósito: o número que
+     diz o quanto o outro vale não pode viver em 13px cinza. */
+  .veredito { background:var(--marinho); color:#fff; padding:20px 24px; margin-bottom:20px; }
+  .veredito .figuras { display:flex; gap:40px; flex-wrap:wrap; align-items:flex-start; }
+  .veredito strong { display:block; font-size:44px; line-height:1; font-weight:700;
+                     font-variant-numeric:tabular-nums; }
+  .veredito span.rot { display:block; font-size:11px; text-transform:uppercase;
+                       letter-spacing:.08em; color:var(--ambar); font-weight:700;
+                       margin-top:6px; max-width:26ch; }
+  .veredito .grade { display:grid; grid-template-columns:repeat(19,10px); gap:3px;
+                     margin-top:10px; }
+  .veredito .grade i { width:10px; height:10px; display:block; }
+  .veredito .grade i[data-cheio] { background:var(--ambar); }
+  .veredito .grade i:not([data-cheio]) { box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.30); }
+  .veredito .barra-base { height:10px; background:rgba(255,255,255,.22); margin-top:10px;
+                          max-width:260px; }
+  .veredito .barra-base i { display:block; height:100%; background:var(--ambar); }
+  .veredito .frase { margin:18px 0 0; font-size:15px; color:#fff; max-width:62ch; }
+  .veredito .filete { margin:14px 0 0; padding-top:12px; font-size:12px; color:#b9c8dc;
+                      border-top:1px solid rgba(255,255,255,.18); }
+  .veredito.alerta { border-left:6px solid var(--vermelho); }
+
+  section.bloco { background:#fff; border:1px solid var(--linha); padding:20px 22px;
+                  margin-bottom:20px; }
+  section.bloco > h2 { margin:0 0 4px; font-size:15px; color:var(--marinho); }
+  section.bloco > p.dica { margin:0 0 16px; font-size:12.5px; color:var(--cinza);
+                           max-width:78ch; }
+
+  /* ---- cartões de afirmação ---- */
+  .afirmacoes { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+                gap:12px; }
+  .afirma { background:#fff; border:1px solid var(--linha); border-left:4px solid var(--nulo);
+            padding:13px 15px; }
+  .afirma .glifo { font-size:20px; line-height:1; color:var(--nulo); font-weight:700; }
+  .afirma .fato { display:block; font-size:14px; font-weight:700; color:var(--marinho);
+                  margin-top:6px; }
+  .afirma .porque { display:block; font-size:12.5px; color:var(--cinza); margin-top:6px; }
+  .afirma.sim { border-left-color:var(--verde); }
+  .afirma.sim .glifo { color:var(--verde); }
+  .afirma.falha { border-left-color:var(--vermelho); }
+  .afirma.falha .glifo { color:var(--vermelho); }
+
+  /* ---- comentários ---- */
+  .comentarios { counter-reset:coment; }
+  .comentario { position:relative; border-left:3px solid var(--vermelho); background:#fdf1f2;
+                padding:11px 15px 13px 34px; margin-bottom:11px; font-size:14.5px;
+                line-height:1.72; max-width:70ch; break-inside:avoid; }
+  .comentario::before { counter-increment:coment; content:counter(coment);
+                        position:absolute; left:13px; top:11px; font-size:13px;
+                        font-weight:700; color:var(--vermelho); }
+  .comentario.elogio { border-left-color:var(--ambar); background:var(--ambar-fundo); }
+  .comentario.elogio::before { color:#9a6b06; }
+  .decisao { display:none; margin:10px 0 0; padding-top:8px; font-size:12px;
+             color:var(--cinza); border-top:1px dashed #cbd4e0; }
+
+  details { margin-top:14px; }
+  summary { cursor:pointer; font-size:13px; font-weight:700; color:var(--azul);
+            padding:8px 0; }
+
+  /* ---- faixas ---- */
+  .grupo-titulo { font-size:11px; text-transform:uppercase; letter-spacing:.08em;
+                  color:var(--cinza); font-weight:700; margin:18px 0 8px; }
+  .grupo-titulo:first-child { margin-top:0; }
+  /* A faixa de sobreposição comum tem de começar onde a pista
+     começa, e a pista é a segunda coluna do grid. As medidas saem
+     das mesmas variáveis, para as duas nunca ficarem fora de
+     sincronia. */
+  .pista-fundo { position:relative; --rot:230px; --vao:10px; }
+  .comum { position:absolute; top:0; bottom:0; pointer-events:none;
+           background:rgba(31,111,192,.09);
+           left:calc(var(--rot) + var(--vao) + (100% - var(--rot) - var(--vao)) * var(--lo));
+           width:calc((100% - var(--rot) - var(--vao)) * var(--larg)); }
+  .faixa-linha { display:grid; grid-template-columns:230px 1fr; align-items:center;
+                 gap:10px; min-height:22px; break-inside:avoid; }
+  .faixa-linha .rot { font-size:13px; color:var(--marinho); font-weight:700; }
+  .faixa-linha .rot em { display:block; font-style:normal; font-size:11px;
+                         color:var(--cinza); font-weight:400; }
+  .faixa-linha .pista { position:relative; height:20px; }
+  .faixa-linha .pista::before { content:''; position:absolute; left:0; right:0; top:9px;
+    height:1px; background:repeating-linear-gradient(to right,
+      #e4e9f0 0 1px, transparent 1px 25%); }
+  .faixa-linha .pista .fx { position:absolute; top:7px; height:6px; border-radius:3px;
+                            background:rgba(31,111,192,.5); border:1px solid var(--marinho); }
+  .faixa-linha .pista .fx.parcial { border-style:dashed; }
+  .faixa-linha .pista .tique { position:absolute; top:3px; width:2px; height:14px;
+                               background:var(--marinho); }
+  .faixa-linha .pista .semfaixa { position:absolute; top:2px; font-size:11px;
+                                  color:var(--cinza); }
+  .eixo { display:grid; grid-template-columns:230px 1fr; gap:10px; margin-top:6px; }
+  .eixo .marcas { display:flex; justify-content:space-between; font-size:11px;
+                  color:var(--cinza); }
+  .legenda-comum { font-size:11px; color:var(--cinza); margin:8px 0 0 240px; }
+
+  /* ---- interesses ---- */
+  .grupo-int { margin-bottom:14px; }
+  .grupo-int .cab { font-size:11px; text-transform:uppercase; letter-spacing:.08em;
+                    color:var(--cinza); font-weight:700; display:flex; align-items:center;
+                    gap:10px; }
+  .pastilhas { display:flex; gap:4px; }
+  .pastilhas i { width:10px; height:10px; border-radius:50%; display:block; }
+  .pastilhas i[data-cheio] { background:var(--marinho); }
+  .pastilhas i:not([data-cheio]) { box-shadow:inset 0 0 0 1.5px var(--nulo); }
+  .grupo-int ul { margin:6px 0 0; padding-left:0; list-style:none; }
+  .grupo-int li { font-size:14px; color:var(--marinho); padding:2px 0; }
+
+  /* ---- anexo ---- */
+  table.medias { width:100%; border-collapse:collapse; font-size:13.5px; }
+  table.medias th { text-align:left; font-size:10.5px; text-transform:uppercase;
+                    letter-spacing:.07em; color:var(--cinza); font-weight:700;
+                    border-bottom:1px solid var(--linha); padding:0 8px 8px 0; }
+  table.medias td { padding:8px 8px 8px 0; border-bottom:1px solid #f1f4f8; }
+  table.medias td.item { font-weight:700; color:var(--marinho); }
+  table.medias td.base, table.medias td.med { font-weight:700; color:var(--marinho);
+                                              font-variant-numeric:tabular-nums; }
+  table.medias td.brutas { font-variant-numeric:tabular-nums; letter-spacing:.35em;
+                           color:var(--cinza); }
+  table.medias td.brutas b { color:var(--vermelho); }
+  table.medias tr.sub td { background:#f7f9fb; font-size:10.5px; text-transform:uppercase;
+                           letter-spacing:.07em; color:var(--cinza); font-weight:700;
+                           border-bottom:1px solid var(--linha); }
+
+  .link { background:var(--areia); border-left:4px solid var(--marinho);
+          padding:14px 18px; margin:16px 0; font-size:13.5px; word-break:break-all; }
+  .link b { color:var(--marinho); }
+  .estado { display:inline-block; padding:2px 9px; font-size:11px; font-weight:700;
+            text-transform:uppercase; letter-spacing:.06em; }
+  .estado.aberta { background:#e3f3ea; color:var(--verde); }
+  .estado.fechada { background:#fdecea; color:var(--vermelho); }
+  .copiar { background:#fff; border:1.5px solid var(--linha); color:var(--marinho);
+            font-size:12.5px; padding:8px 14px; margin-top:10px; }
+
+  .vazia h2 { margin:0 0 10px; font-size:20px; color:var(--marinho); }
+  .vazia p { margin:0 0 12px; font-size:15px; }
+  .vazia p.obs { font-size:13px; color:var(--cinza); }
+
+  .oculto { display:none !important; }
+
+  @media (max-width:760px) {
+    .faixa-linha, .eixo { grid-template-columns:1fr; }
+    .faixa-linha .rot { margin-bottom:2px; }
+    .legenda-comum { margin-left:0; }
+    /* Numa coluna só, a faixa comum não tem onde se alinhar. */
+    .comum { display:none; }
+    .veredito .figuras { gap:24px; }
+    .veredito strong { font-size:36px; }
+  }
+  @media print {
+    body { background:#fff; }
+    header { background:#fff; color:var(--marinho); }
+    header .olho { color:var(--vermelho); }
+    .abas, #sair, .copiar, .pendencia button { display:none !important; }
+    .veredito { background:#fff; color:var(--marinho);
+                border-left:4px solid var(--marinho); }
+    .veredito strong, .veredito .frase { color:var(--marinho); }
+    .veredito span.rot { color:var(--vermelho); }
+    .veredito .filete { color:var(--cinza); border-top-color:var(--linha); }
+    .veredito .grade i[data-cheio], .veredito .barra-base i { background:var(--marinho); }
+    .veredito .grade i:not([data-cheio]) { box-shadow:inset 0 0 0 1px #999; }
+    .decisao { display:block; }
+    details > *:not(summary) { display:block !important; }
+    section.bloco, .comentario, .faixa-linha { break-inside:avoid; }
+    #anexo { page-break-before:always; }
+    .grade i, .pista .fx, .pastilhas i { -webkit-print-color-adjust:exact;
+                                         print-color-adjust:exact; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="env">
+    <div>
+      <span class="olho">Career Day · Alfa University Fair</span>
+      <h1>Respostas das pesquisas</h1>
+    </div>
+    <div style="text-align:right">
+      <a href="#" id="sair" class="oculto">sair</a>
+    </div>
+  </div>
+</header>
+
+<div class="env">
+
+  <div class="acesso" id="acesso">
+    <h2>Acesso da direção</h2>
+    <p class="sub">Entre com o e-mail cadastrado. O código chega por e-mail e vale
+      uma vez.</p>
+
+    <div id="passo-email">
+      <label for="email">E-mail</label>
+      <input id="email" type="email" inputmode="email" autocomplete="email"
+             autocapitalize="none" spellcheck="false" placeholder="seu@email.com">
+      <button type="button" class="primario" id="btn-codigo">Enviar código</button>
+    </div>
+
+    <div id="passo-codigo" class="oculto">
+      <label for="codigo">Código de 6 dígitos</label>
+      <input id="codigo" type="text" inputmode="numeric" autocomplete="one-time-code"
+             maxlength="6" placeholder="000000">
+      <button type="button" class="primario" id="btn-entrar">Entrar</button>
+    </div>
+
+    <p class="msg" id="aviso"></p>
+  </div>
+
+  <div id="painel" class="oculto">
+    <div id="pendencia"></div>
+    <div class="abas">
+      <button type="button" id="aba-uni" aria-selected="true"></button>
+      <button type="button" id="aba-fam" aria-selected="false"></button>
+    </div>
+    <div id="conteudo"></div>
+  </div>
+
+</div>
+
+<script>
+const SUPABASE_URL      = window.CONFIG.SUPABASE_URL;
+const SUPABASE_ANON_KEY = window.CONFIG.SUPABASE_ANON_KEY;
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const $ = s => document.querySelector(s);
+const mostrar = (el, ver) => el.classList.toggle('oculto', !ver);
+const esc = t => String(t == null ? '' : t)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/* ============================================================
+   Constantes de leitura
+
+   Nenhum número desta tela é digitado no HTML. Toda frase é
+   montada a partir das respostas — se chegar uma sétima com um 2
+   em sinalização, a tela muda sozinha.
+   ============================================================ */
+const BASE_MINIMA    = 30;   // abaixo disso a tela entra em "modo base pequena"
+const BASE_BRUTOS    = 12;   // até aqui o anexo imprime as notas uma a uma
+const BASE_PERFIL    = 10;   // mínimo por perfil para a tabela cruzada voltar
+const PISO_MARGEM    = 0.30; // meia-largura mínima da faixa, mesmo com todos concordando
+
+/* Comparar o MAIOR contra o MENOR de 22 itens não é comparar dois
+   itens escolhidos de antemão. O fator alarga a margem para dar
+   conta dessa escolha a posteriori. É grosseiro e conservador de
+   propósito: o padrão desta tela é "não dá para dizer". */
+const FATOR_EXTREMOS = 1.8;
+
+const T95 = { 2:12.71, 3:4.30, 4:3.18, 5:2.78, 6:2.57, 7:2.45, 8:2.36, 9:2.31,
+              10:2.26, 11:2.23, 12:2.20, 13:2.18, 14:2.16, 15:2.13, 16:2.12,
+              17:2.11, 18:2.10, 19:2.09, 20:2.09 };
+
+/* ============================================================
+   ACESSO — mesmo login das outras telas da direção
+   ============================================================ */
+function avisar(txt, erro) {
+  $('#aviso').textContent = txt || '';
+  $('#aviso').className = 'msg' + (erro ? ' erro' : '');
+}
+
+/* O Supabase responde em inglês, e "Signups not allowed for otp" não
+   diz a ninguém que o problema é uma letra errada no endereço. */
+function erroDeLogin(e) {
+  const m = (e && e.message) || String(e);
+  return /Signups not allowed|signup_disabled/i.test(m)
+      ? 'E-mail não cadastrado. Confira se digitou o endereço completo.'
+    : /expired|invalid/i.test(m)
+      ? 'Código inválido ou expirado. Peça um novo — e use o último que chegar, ' +
+        'porque pedir outro cancela o anterior.'
+    : /rate limit|too many|429/i.test(m)
+      ? 'Muitos pedidos de código seguidos. Aguarde alguns minutos.'
+    : /Failed to fetch|NetworkError/i.test(m)
+      ? 'Sem conexão. Confira a rede e tente de novo.'
+      : m;
+}
+
+$('#btn-codigo').addEventListener('click', async function () {
+  const email = $('#email').value.trim().toLowerCase();
+  if (!email) return avisar('Digite o e-mail.', true);
+  this.disabled = true;
+  avisar('Enviando…');
+  const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+  this.disabled = false;
+  if (error) return avisar(erroDeLogin(error), true);
+  mostrar($('#passo-email'), false);
+  mostrar($('#passo-codigo'), true);
+  avisar('Código enviado. Confira o e-mail — e o spam.');
+  $('#codigo').focus();
+});
+
+$('#btn-entrar').addEventListener('click', async function () {
+  const email = $('#email').value.trim().toLowerCase();
+
+  /* Só dígitos, e exatamente 6: no celular o código vai por cópia e
+     cola e vem com espaço ou um pedaço do texto em volta. Tentativa
+     errada queima o código e obriga a pedir outro. */
+  const token = $('#codigo').value.replace(/\D/g, '');
+  if (token.length < 6) {
+    return avisar('Código incompleto. Confira o que chegou por e-mail.', true);
+  }
+
+  this.disabled = true;
+  avisar('Entrando…');
+  const { error } = await sb.auth.verifyOtp({ email, token, type: 'email' });
+  this.disabled = false;
+  if (error) return avisar(erroDeLogin(error), true);
+  avisar('');
+  iniciar();
+});
+
+$('#sair').addEventListener('click', async e => {
+  e.preventDefault();
+  await sb.auth.signOut();
+  location.reload();
+});
+
+/* ============================================================
+   Contas
+   ============================================================ */
+const valores = (linhas, chave) =>
+  linhas.map(r => r[chave]).filter(v => v !== null && v !== undefined);
+
+/* Uma casa decimal e vírgula. Com base 6 toda média é múltipla de
+   0,167 — a segunda casa é ruído puro, e "4.70" está errado em
+   português. */
+const fmt = (n, casas) => n === null || n === undefined ? '—'
+  : n.toLocaleString('pt-BR', { minimumFractionDigits: casas === undefined ? 1 : casas,
+                                maximumFractionDigits: casas === undefined ? 1 : casas });
+
+const plural = (n, um, muitos) => n === 1 ? um : muitos;
+
+/* Fisher-Yates. Ver o comentário de juntarComentarios. */
+function embaralhar(lista) {
+  const a = lista.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/* A faixa em que a nota verdadeira provavelmente está: intervalo de
+   95% com t de Student sobre as respostas do item.
+
+   PISO DE ±0,30 quando o desvio é zero. Sem ele, um item em que os
+   seis deram a mesma nota vira um ponto — a tela fingindo certeza
+   absoluta sobre 38 pessoas a partir de 6. É o maior erro possível
+   nesta base.
+
+   SEM correção de população finita. Ela estreitaria a faixa em ~7%
+   com 6 de 38, mas a amostra é autosselecionada e esse viés é maior
+   que o ganho de precisão. Escolher parecer menos preciso para ser
+   mais verdadeiro. */
+function faixa(linhas, chave) {
+  const v = valores(linhas, chave);
+  const n = v.length;
+  if (!n) return { n: 0 };
+
+  const m = v.reduce((s, x) => s + x, 0) / n;
+  if (n < 2) return { n, m, semFaixa: true, parcial: n < linhas.length };
+
+  const s = Math.sqrt(v.reduce((a, x) => a + (x - m) * (x - m), 0) / (n - 1));
+  const t = T95[n] || 1.96;
+  const margem = Math.max(PISO_MARGEM, t * s / Math.sqrt(n));
+
+  return {
+    n, m, s, margem,
+    lo: Math.max(1, m - margem),
+    hi: Math.min(5, m + margem),
+    concordaram: s === 0,
+    parcial: n < linhas.length
+  };
+}
+
+/* ============================================================
+   As duas pesquisas
+   ============================================================ */
+const ROTULOS = {
+  q1_geral: 'Experiência geral', q2_pre_evento: 'Comunicação pré-evento',
+  q3_chegada: '3.1 Chegada e credenciamento', q3_estande_espaco: '3.2 Espaço do estande',
+  q3_estande_local: '3.3 Localização do estande', q3_sinalizacao: '3.4 Sinalização',
+  q3_fluxo: '3.5 Fluxo de visitantes', q3_infra_tecnica: '3.6 Infraestrutura técnica',
+  q3_suporte: '3.7 Suporte da equipe', q3_organizacao: '3.8 Organização geral',
+  q4_interesse: '4.1 Alunos: interesse', q4_perguntas: '4.2 Alunos: qualidade das perguntas',
+  q4_confianca: '4.3 Alunos: confiança', q4_consciencia: '4.4 Alunos: conhecimento',
+  q4_geral: '4.5 Alunos: interação geral', q5_ingles: 'Inglês dos alunos',
+  q6_acesso: '6.1 Plataforma: acesso', q6_uso: '6.2 Plataforma: uso',
+  q6_captura: '6.3 Plataforma: captação', q6_confiabilidade: '6.4 Plataforma: confiabilidade',
+  q6_utilidade: '6.5 Plataforma: utilidade', q7_valor: 'Valor da participação',
+  q2_organizacao: 'Organização e circulação',
+  q3_universidades: 'Qualidade e diversidade das universidades',
+  q4_contribuicao: 'Contribuição para as decisões da família',
+  q5_valor: 'Valor de iniciativas como esta'
+};
+
+/* Agrupamento declarado, para nenhum item ficar órfão: q5_ingles
+   sumiria de um agrupamento automático por prefixo. */
+const GRUPOS_UNI = [
+  ['Visão geral',                  ['q1_geral', 'q2_pre_evento', 'q7_valor']],
+  ['Organização e infraestrutura', ['q3_chegada', 'q3_estande_espaco', 'q3_estande_local',
+                                    'q3_sinalizacao', 'q3_fluxo', 'q3_infra_tecnica',
+                                    'q3_suporte', 'q3_organizacao']],
+  ['Nossos alunos',                ['q4_interesse', 'q4_perguntas', 'q4_confianca',
+                                    'q4_consciencia', 'q4_geral', 'q5_ingles']],
+  ['Plataforma do evento',         ['q6_acesso', 'q6_uso', 'q6_captura',
+                                    'q6_confiabilidade', 'q6_utilidade']]
+];
+
+const ITENS_FAM = ['q1_geral', 'q2_organizacao', 'q3_universidades',
+                   'q4_contribuicao', 'q5_valor'];
+const GRUPOS_FAM = [['Como foi para a família', ITENS_FAM]];
+
+const INTERESSES = {
+  'futuras-edicoes': 'Futuras edições da feira', 'visitas': 'Visitas ao campus',
+  'apresentacoes': 'Apresentações para alunos', 'workshops': 'Workshops ou palestras',
+  'webinars': 'Webinars', 'processos': 'Sessões sobre processos seletivos',
+  'bolsas': 'Bolsas e auxílio', 'familias': 'Sessões para famílias',
+  'counselors': 'Encontros com counselors', 'parcerias': 'Outras parcerias',
+  'nao-agora': 'Não neste momento'
+};
+
+const PERFIL = { responsavel: 'responsáveis', aluno: 'alunos', ambos: 'responderam juntos' };
+
+/* ============================================================
+   Blocos
+   ============================================================ */
+
+/* ---- 1. faixa do veredito ---- */
+function blocoVeredito(r, convidados, chaves, extra) {
+  const n = r.length;
+  const taxa = convidados ? Math.round(n / convidados * 100) : null;
+
+  const cheias = chaves.map(c => faixa(r, c)).filter(f => f.n && !f.parcial && f.m !== undefined);
+  const medias = cheias.map(f => f.m);
+  const menor = medias.length ? Math.min(...medias) : null;
+  const maior = medias.length ? Math.max(...medias) : null;
+
+  /* Alerta de falha real: média abaixo de 3,5 ou qualquer nota
+     individual de 1 ou 2. É a única coisa que pinta a faixa de
+     vermelho. */
+  const fracos = chaves.filter(c => { const f = faixa(r, c); return f.m !== undefined && f.m < 3.5; });
+  const baixas = chaves.some(c => valores(r, c).some(v => v <= 2));
+  const alerta = fracos.length > 0 || baixas;
+
+  const grade = convidados && convidados <= 120
+    ? '<div class="grade">' + Array.from({ length: convidados }, (_, i) =>
+        '<i' + (i < n ? ' data-cheio' : '') + '></i>').join('') + '</div>'
+    : '<div class="barra-base"><i style="width:' + (taxa || 0) + '%"></i></div>';
+
+  const silenciosos = convidados - n;
+
+  return '<div class="veredito' + (alerta ? ' alerta' : '') + '">' +
+    '<div class="figuras">' +
+      (extra || '') +
+      '<div><strong>' + n + ' de ' + convidados + '</strong>' +
+      '<span class="rot">' + esc(extra ? 'responderam' : 'responderam') +
+      (taxa !== null ? ' · ' + taxa + '%' : '') + '</span>' + grade + '</div>' +
+    '</div>' +
+
+    (menor !== null
+      ? '<p class="frase">' + (alerta
+          ? 'Atenção: ' + esc(fracos.map(c => ROTULOS[c]).join(', ')) +
+            (fracos.length ? ' ' + plural(fracos.length, 'ficou', 'ficaram') + ' abaixo de 3,5. ' : '') +
+            (baixas ? 'Houve nota 1 ou 2. ' : '')
+          : '') +
+        'Entre ' + plural(n, 'a resposta recebida', 'as ' + n + ' respostas recebidas') +
+        ', as médias ficaram entre ' + fmt(menor) + ' e ' + fmt(maior) +
+        ' numa escala até 5.' +
+        (silenciosos > 0
+          ? ' Faltam ' + silenciosos + ' ' + plural(silenciosos, 'convidado', 'convidados') +
+            ', e é justamente aí que uma insatisfação ficaria escondida.'
+          : '') + '</p>'
+      : '') +
+
+    '<p class="filete">Respostas anônimas · foto de ' +
+      esc(new Date(DADOS.agora).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })) +
+    '</p></div>';
+}
+
+/* ---- 2. o que dá para afirmar ---- */
+function cartao(classe, glifo, fato, porque) {
+  return '<div class="afirma ' + classe + '"><span class="glifo">' + glifo + '</span>' +
+    '<span class="fato">' + esc(fato) + '</span>' +
+    '<span class="porque">' + esc(porque) + '</span></div>';
+}
+
+function blocoAfirmar(r, convidados, chaves, opcoes) {
+  const n = r.length;
+  if (!n) return '';
+  const o = opcoes || {};
+  const cartoes = [];
+
+  /* --- vermelhos, sempre primeiro --- */
+  const fracos = chaves.filter(c => { const f = faixa(r, c); return f.m !== undefined && f.m < 3.5; });
+  fracos.forEach(c => {
+    const f = faixa(r, c);
+    cartoes.push(cartao('falha', '!', ROTULOS[c] + ' ficou em ' + fmt(f.m) + '.',
+      'Abaixo de 3,5 numa escala até 5.'));
+  });
+
+  chaves.forEach(c => {
+    const b = valores(r, c).filter(v => v <= 2);
+    if (b.length) {
+      cartoes.push(cartao('falha', '!',
+        'Alguém deu nota ' + Math.min(...b) + ' em ' + ROTULOS[c] + '.',
+        'Conferido resposta por resposta, não pela média.'));
+    }
+  });
+
+  /* --- verdes --- */
+  if (o.voltar) {
+    const v = valores(r, o.voltar);
+    if (v.length >= 3 && v.every(x => x === 10)) {
+      cartoes.push(cartao('sim', '✓',
+        'Os ' + v.length + ' que responderam querem voltar: todos deram 10 de 10 para 2027.',
+        'Concordância total é a única evidência que uma base de ' + v.length + ' não enfraquece.'));
+    } else if (v.length >= 3 && v.every(x => x >= 9)) {
+      cartoes.push(cartao('sim', '✓',
+        v.length + ' de ' + v.length + ' deram 9 ou 10 para voltar em 2027.',
+        'Concordância total é a única evidência que uma base de ' + v.length + ' não enfraquece.'));
+    }
+  }
+
+  const cheias = chaves.map(c => faixa(r, c)).filter(f => f.n >= 2 && !f.parcial);
+  if (cheias.length) {
+    const menor = Math.min(...cheias.map(f => f.m));
+    const piso = Math.min(...cheias.map(f => f.lo));
+    /* NUNCA dizer "nenhum item ficou abaixo de 4" seco: sem o
+       escopo e sem o piso do intervalo, o selo verde converte
+       amostra em população. */
+    cartoes.push(cartao('sim', '✓',
+      'Entre ' + plural(n, 'a resposta recebida', 'as ' + n + ' respostas recebidas') +
+      ', nenhum item ficou abaixo de ' + fmt(menor) + ' numa escala até 5.',
+      'É um fato sobre ' + plural(n, 'essa resposta', 'essas ' + n) +
+      '. Considerando a margem, a nota verdadeira dos itens mais baixos pode estar ' +
+      'em torno de ' + fmt(piso) + '.'));
+  }
+
+  const temBaixa = chaves.some(c => valores(r, c).some(v => v <= 2));
+  if (!temBaixa) {
+    cartoes.push(cartao('sim', '✓',
+      'Ninguém deu nota 1 ou 2 em nenhum dos ' + chaves.length + ' itens.',
+      'Conferido resposta por resposta, não pela média.'));
+  }
+
+  if (o.comentarios) {
+    const c = r.filter(x => x[o.comentarios]).length;
+    if (c) {
+      cartoes.push(cartao('sim', '✓',
+        c + ' ' + plural(c, 'respondente escreveu', 'respondentes escreveram') + ' o que melhorar.',
+        'Relato escrito é ocorrência, não amostra: um basta para justificar um conserto.'));
+    }
+  }
+
+  /* --- cinzas --- */
+  if (cheias.length >= 2) {
+    const ms = cheias.map(f => f.m);
+    const amp = Math.max(...ms) - Math.min(...ms);
+    const fMax = cheias.find(f => f.m === Math.max(...ms));
+    const fMin = cheias.find(f => f.m === Math.min(...ms));
+    const margemDif = Math.sqrt(fMax.margem * fMax.margem + fMin.margem * fMin.margem);
+    const limite = margemDif * FATOR_EXTREMOS;
+
+    /* Mesmo quando a amplitude passa a margem, a tela não afirma um
+       ranking — sugere onde olhar. Este cartão nunca é verde. */
+    cartoes.push(amp < limite
+      ? cartao('', '—', 'Qual item foi o melhor ou o pior — não dá para dizer.',
+          'A distância entre o item mais alto e o mais baixo (' + fmt(amp, 1) +
+          ') é menor que a margem de erro dessa comparação (±' + fmt(limite, 1) + ').')
+      : cartao('', '—',
+          'A distância entre o item mais alto e o mais baixo (' + fmt(amp, 1) +
+          ') passa da margem (±' + fmt(limite, 1) + ').',
+          'Vale olhar os extremos no anexo. Continua sendo a opinião de ' + n +
+          ' ' + plural(n, 'pessoa', 'pessoas') + '.'));
+  }
+
+  const silenciosos = convidados - n;
+  if (silenciosos > 0) {
+    cartoes.push(cartao('', '—',
+      'O que pensam ' + plural(silenciosos, 'o convidado que não respondeu',
+        'os ' + silenciosos + ' que não responderam') + ' — não dá para dizer.',
+      'Quem responde pesquisa costuma ser quem gostou muito ou quem tem uma queixa ' +
+      'específica. Provavelmente estas notas são otimistas em relação aos ' +
+      convidados + '.'));
+  }
+
+  chaves.forEach(c => {
+    const f = faixa(r, c);
+    if (f.n && f.parcial) {
+      cartoes.push(cartao('', '—',
+        ROTULOS[c] + ' — ' + f.n + ' de ' + n + ' responderam este item.',
+        'A média deste item não deve ser usada. A não-resposta é ela mesma um achado: ' +
+        'vale perguntar por que parte deixou em branco.'));
+    }
+  });
+
+  return '<section class="bloco"><h2>O que dá para afirmar</h2>' +
+    '<p class="dica">Com ' + n + ' ' + plural(n, 'resposta', 'respostas') +
+    ', algumas coisas são fato e outras não têm como ser sabidas. ' +
+    'Esta separação é calculada, não escrita.</p>' +
+    '<div class="afirmacoes">' + cartoes.join('') + '</div></section>';
+}
+
+/* ---- 3. comentários ----
+
+   Agrupar por TIPO e embaralhar dentro do tipo. Percorrer linha a
+   linha punha o elogio e a crítica da mesma instituição em
+   sequência — com base 6, isso remonta um respondente. A ordem de
+   tela deixa de ter qualquer relação com a ordem das linhas.
+
+   O número é POSIÇÃO NA TELA, para a reunião poder dizer "vamos ao
+   comentário 2". Nunca identificação de respondente, e só é seguro
+   porque a lista é embaralhada. */
+function blocoComentarios(r, chaveMelhoria, chaveElogio) {
+  const melhorias = embaralhar(r.map(x => x[chaveMelhoria]).filter(Boolean));
+  const elogios = embaralhar(r.map(x => x[chaveElogio]).filter(Boolean));
+  const n = r.length;
+
+  if (!melhorias.length && !elogios.length) {
+    return '<section class="bloco"><h2>O que pediram para consertar</h2>' +
+      '<p class="dica">Ninguém escreveu comentário ainda.</p></section>';
+  }
+
+  const decisao = '<p class="decisao">Decisão: ______________________________  ' +
+                  'Quem: ____________  Até: __________</p>';
+
+  return '<section class="bloco"><h2>O que pediram para consertar</h2>' +
+    '<p class="dica">' + melhorias.length + ' de ' + n + ' ' +
+    plural(n, 'escreveu', 'escreveram') + '. Um relato não é uma amostra: é uma ' +
+    'ocorrência. Um único relato basta para justificar um conserto; ' + n +
+    ' notas não bastam para justificar uma comparação — é por isso que este bloco ' +
+    'vem antes das notas.</p>' +
+
+    (melhorias.length
+      ? '<div class="comentarios">' + melhorias.map(t =>
+          '<div class="comentario">' + esc(t) + decisao + '</div>').join('') + '</div>'
+      : '<p class="dica">Ninguém escreveu o que melhorar.</p>') +
+
+    (elogios.length
+      ? '<details><summary>O que já funciona — ' + elogios.length + ' ' +
+        plural(elogios.length, 'relato', 'relatos') + '</summary>' +
+        '<div class="comentarios">' + elogios.map(t =>
+          '<div class="comentario elogio">' + esc(t) + '</div>').join('') + '</div></details>'
+      : '') +
+    '</section>';
+}
+
+/* ---- 4. as notas como faixas ---- */
+function blocoFaixas(r, grupos) {
+  const n = r.length;
+  if (!n) return '';
+
+  const chaves = grupos.flatMap(([, cs]) => cs);
+  const total = chaves.length;
+
+  /* Acima de BASE_MINIMA as faixas dão lugar à tabela com barras e
+     distribuição, que aí passam a fazer sentido. */
+  if (n >= BASE_MINIMA) return blocoTabelaClassica(r, grupos);
+
+  const cheias = chaves.map(c => faixa(r, c)).filter(f => f.n >= 2 && !f.parcial);
+  const comumLo = cheias.length ? Math.max(...cheias.map(f => f.lo)) : null;
+  const comumHi = cheias.length ? Math.min(...cheias.map(f => f.hi)) : null;
+  const temComum = comumLo !== null && comumHi > comumLo;
+
+  const pos = v => (v - 1) / 4 * 100;
+
+  const linhas = grupos.map(([titulo, cs]) =>
+    '<div class="grupo-titulo">' + esc(titulo) + '</div>' +
+    cs.map(c => {
+      const f = faixa(r, c);
+      const marca = f.parcial ? '<em>' + f.n + ' de ' + n + ' responderam</em>'
+                  : f.concordaram ? '<em>' + plural(f.n, 'a resposta', 'os ' + f.n) +
+                                    ' ' + plural(f.n, 'única', 'concordaram') + '</em>'
+                  : '';
+
+      const pista = !f.n ? '<span class="semfaixa">sem resposta</span>'
+        : f.semFaixa ? '<span class="semfaixa">' + f.n + ' resposta — sem faixa</span>'
+        : '<span class="fx' + (f.parcial ? ' parcial' : '') + '" style="left:' +
+            pos(f.lo).toFixed(1) + '%;width:' + (pos(f.hi) - pos(f.lo)).toFixed(1) + '%"></span>' +
+          (f.parcial ? '' : '<span class="tique" style="left:' + pos(f.m).toFixed(1) + '%"></span>');
+
+      return '<div class="faixa-linha"><span class="rot">' + esc(ROTULOS[c] || c) + marca +
+        '</span><span class="pista">' + pista + '</span></div>';
+    }).join('')).join('');
+
+  return '<section class="bloco"><h2>As ' + total + ' notas</h2>' +
+    '<p class="dica">Cada traço é a faixa em que a nota verdadeira provavelmente está, ' +
+    'considerando que só ' + n + ' ' + plural(n, 'pessoa respondeu', 'pessoas responderam') +
+    '. Como os traços se cruzam, não dá para dizer que um item foi melhor que outro. ' +
+    'Por isso os itens estão na ordem do questionário, e não da maior para a menor nota.</p>' +
+
+    '<div class="pista-fundo">' +
+      (temComum ? '<span class="comum" style="--lo:' + (pos(comumLo) / 100).toFixed(4) +
+        ';--larg:' + ((pos(comumHi) - pos(comumLo)) / 100).toFixed(4) + '"></span>' : '') +
+      linhas +
+    '</div>' +
+
+    '<div class="eixo"><span></span><span class="marcas">' +
+      '<i>1</i><i>2</i><i>3</i><i>4</i><i>5</i></span></div>' +
+    (temComum ? '<p class="legenda-comum">Faixa em que todos os itens de base completa ' +
+      'se sobrepõem: ' + fmt(comumLo) + ' a ' + fmt(comumHi) + '.</p>' : '') +
+    '</section>';
+}
+
+/* Modo base grande. Fica aqui, não apagado: com 30 respostas ou
+   mais a barra de média e a distribuição voltam a informar. */
+function blocoTabelaClassica(r, grupos) {
+  const linhas = grupos.map(([titulo, cs]) =>
+    '<tr class="sub"><td colspan="4">' + esc(titulo) + '</td></tr>' +
+    cs.map(c => {
+      const f = faixa(r, c);
+      const d = [0, 0, 0, 0, 0];
+      valores(r, c).forEach(v => { if (v >= 1 && v <= 5) d[v - 1]++; });
+      return '<tr><td class="item">' + esc(ROTULOS[c] || c) + '</td>' +
+        '<td class="base">' + f.n + '</td>' +
+        '<td class="med">' + fmt(f.m) + '</td>' +
+        '<td class="brutas">' + d.join('/') + '</td></tr>';
+    }).join('')).join('');
+
+  return '<section class="bloco"><h2>As notas</h2>' +
+    '<table class="medias"><tr><th>Item</th><th>Base</th><th>Média</th>' +
+    '<th>Notas 1 a 5</th></tr>' + linhas + '</table></section>';
+}
+
+/* ---- 5. interesses ----
+   Agrupado por contagem exata. Agrupar não é julgamento: é o dado.
+   E torna os empates visíveis, que era o que a lista contínua
+   escondia. A barra proporcional saiu: "5 de 6" lido como 83% é
+   precisão fabricada. */
+function blocoInteresses(r) {
+  const responderam = r.filter(x => (x.q10_interesses || []).length);
+  if (!responderam.length) return '';
+
+  const conta = {};
+  r.forEach(x => (x.q10_interesses || []).forEach(i => conta[i] = (conta[i] || 0) + 1));
+
+  const porContagem = {};
+  Object.entries(conta).forEach(([k, v]) => {
+    (porContagem[v] = porContagem[v] || []).push(INTERESSES[k] || k);
+  });
+
+  const n = r.length;
+  const grupos = Object.keys(porContagem).map(Number).sort((a, b) => b - a).map(q =>
+    '<div class="grupo-int"><div class="cab">' + q + ' ' + plural(n, 'de ' + n, 'das ' + n) +
+    ' ' + plural(q, 'marcou', 'marcaram') +
+    '<span class="pastilhas">' + Array.from({ length: n }, (_, i) =>
+      '<i' + (i < q ? ' data-cheio' : '') + '></i>').join('') + '</span></div>' +
+    '<ul>' + porContagem[q].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+      .map(t => '<li>' + esc(t) + '</li>').join('') + '</ul></div>').join('');
+
+  return '<section class="bloco"><h2>O que topariam fazer depois da feira</h2>' +
+    grupos +
+    '<p class="dica" style="margin:14px 0 0">' + responderam.length + ' de ' + n +
+    ' responderam esta pergunta' +
+    (n - responderam.length ? '; ' + (n - responderam.length) + ' não ' +
+      plural(n - responderam.length, 'marcou', 'marcaram') + ' nada' : '') +
+    '. É múltipla escolha, então a soma passa de ' + n + '. Uma opção com 1 marcação ' +
+    'significa que uma instituição marcou — não que as outras recusaram.</p></section>';
+}
+
+/* ---- 6. anexo ---- */
+function blocoAnexo(r, grupos, extra) {
+  const n = r.length;
+  if (!n) return extra || '';
+
+  const linhas = grupos.map(([titulo, cs]) =>
+    '<tr class="sub"><td colspan="5">' + esc(titulo) + '</td></tr>' +
+    cs.map(c => {
+      const f = faixa(r, c);
+      const v = valores(r, c).slice().sort((a, b) => b - a);
+
+      /* Até BASE_BRUTOS, as próprias notas. É o que restitui, exato
+         e em poucos caracteres, o que as micro-barras de
+         distribuição fingiam dar. */
+      const brutas = !v.length ? '—'
+        : v.length <= BASE_BRUTOS
+          ? v.map(x => x <= 2 ? '<b>' + x + '</b>' : x).join(' ')
+          : (() => { const d = [0,0,0,0,0]; v.forEach(x => d[x-1]++); return d.join('/'); })();
+
+      return '<tr><td class="item">' + esc(ROTULOS[c] || c) + '</td>' +
+        '<td class="base">' + (f.parcial ? f.n + ' de ' + n : f.n) + '</td>' +
+        '<td class="brutas">' + brutas + '</td>' +
+        '<td class="med">' + fmt(f.m) + '</td>' +
+        '<td class="med">' + (f.lo === undefined ? '—' : fmt(f.lo) + ' – ' + fmt(f.hi)) +
+        '</td></tr>';
+    }).join('')).join('');
+
+  return '<section class="bloco" id="anexo"><details>' +
+    '<summary>Anexo: as notas item a item, o link da pesquisa e a contagem</summary>' +
+    '<table class="medias"><tr><th>Item</th><th>Base</th><th>Notas dadas</th>' +
+    '<th>Média</th><th>Faixa</th></tr>' + linhas + '</table>' +
+    (extra || '') + '</details></section>';
+}
+
+/* ---- 7. como ler ---- */
+function blocoComoLer(r, convidados) {
+  const n = r.length;
+  const silenciosos = convidados - n;
+  return '<section class="bloco"><h2>Como ler esta tela</h2>' +
+    '<p class="dica">As respostas são anônimas. Nenhuma nota e nenhum texto desta tela ' +
+    'está ligado a uma instituição ou a uma família. A ordem dos comentários é ' +
+    'embaralhada de propósito: um elogio e uma crítica que aparecem próximos não são ' +
+    'da mesma pessoa.</p>' +
+    (silenciosos > 0 ? '<p class="dica">Quem responde pesquisa costuma ser quem gostou ' +
+      'muito ou quem tem uma queixa específica. ' + plural(silenciosos, 'O ' + silenciosos +
+      ' que não respondeu é', 'Os ' + silenciosos + ' que não responderam são') +
+      ' justamente onde uma insatisfação ficaria escondida. Por isso estas notas ' +
+      'provavelmente são otimistas em relação aos ' + convidados + '.</p>' : '') +
+    '<p class="dica">As faixas são intervalos de 95% calculados com t de Student sobre as ' +
+    'respostas de cada item, com largura mínima de ±' + fmt(PISO_MARGEM) + ' — quando todos ' +
+    'dão a mesma nota, o desvio é zero, e uma faixa de largura zero afirmaria certeza ' +
+    'absoluta sobre ' + convidados + ' pessoas a partir de ' + n + '. Nenhuma correção de ' +
+    'população finita foi aplicada: ela estreitaria as faixas, e a amostra não é ' +
+    'aleatória.</p></section>';
+}
+
+function blocoLink(pagina, cfg) {
+  const codigo = cfg.codigo || '';
+  const bonito = codigo.length === 8 ? codigo.slice(0, 4) + '-' + codigo.slice(4) : codigo;
+  const url = location.origin + '/' + pagina + '#' + bonito;
+  return '<div class="link"><b>Link da pesquisa</b> ' +
+    '<span class="estado ' + (cfg.aberta ? 'aberta">aberta' : 'fechada">encerrada') + '</span><br>' +
+    (codigo ? '<a href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(url) + '</a>' +
+      '<br><button type="button" class="copiar" data-url="' + esc(url) + '">copiar link</button>'
+      : 'ainda não configurado') + '</div>';
+}
+
+/* ============================================================
+   As duas abas
+   ============================================================ */
+function telaUniversidades(d) {
+  const r = d.respostas || [];
+  const chaves = GRUPOS_UNI.flatMap(([, cs]) => cs);
+
+  if (!r.length) {
+    return '<section class="bloco vazia"><h2>A pesquisa das universidades ainda não teve ' +
+      'nenhuma resposta.</h2>' + blocoLink('avaliacao', d) + '</section>';
+  }
+
+  const dez = valores(r, 'q8_voltaria').filter(v => v === 10).length;
+  const baseVolta = valores(r, 'q8_voltaria').length;
+  const figuraVoltar = baseVolta
+    ? '<div><strong>' + dez + ' de ' + baseVolta + '</strong>' +
+      '<span class="rot">deram 10 de 10 para voltar em 2027</span></div>'
+    : '';
+
+  return blocoVeredito(r, d.convidados, chaves, figuraVoltar) +
+    blocoAfirmar(r, d.convidados, chaves,
+      { voltar: 'q8_voltaria', comentarios: 'q9_melhoria' }) +
+    blocoComentarios(r, 'q9_melhoria', 'q9_ponto_forte') +
+    blocoFaixas(r, GRUPOS_UNI) +
+    blocoInteresses(r) +
+    blocoAnexo(r, GRUPOS_UNI, blocoLink('avaliacao', d) +
+      '<p class="dica">' + d.marcados + ' ' + plural(d.marcados, 'representante usou',
+      'representantes usaram') + ' o link pessoal, que deixa marca de participação. ' +
+      'Quem respondeu pelo link geral não é marcado — por isso o total de respostas pode ' +
+      'passar desse número. Não é erro: é o anonimato funcionando. Nenhuma resposta desta ' +
+      'tela está ligada a uma instituição.</p>') +
+    blocoComoLer(r, d.convidados);
+}
+
+function telaFamilias(d) {
+  const r = d.respostas || [];
+
+  /* Com zero respostas, tudo que renderiza com traço sai. Uma taxa
+     de 0% projetada numa parede lê-se como catástrofe de adesão; o
+     fato é outro — o link ainda não foi enviado. */
+  if (!r.length) {
+    const uni = DADOS.universidades;
+    const taxaUni = uni.convidados ? uni.respostas.length / uni.convidados : 0;
+    const estimativa = Math.round(taxaUni * d.convidados);
+    const metade = Math.round(0.10 * d.convidados);
+
+    return '<section class="bloco vazia" style="max-width:620px;border-top:3px solid var(--ambar)">' +
+      '<h2>A pesquisa das famílias ainda não teve nenhuma resposta.</h2>' +
+      '<p>' + d.convidados + ' pessoas credenciadas podem responder. ' +
+      'O link está criado e aberto.</p>' +
+      blocoLink('avaliacao-familias', d) +
+      (taxaUni ? '<p class="obs">Na mesma taxa da pesquisa das universidades (' +
+        Math.round(taxaUni * 100) + '%), seriam cerca de ' + estimativa + ' respostas. ' +
+        'Mesmo a 10%, cerca de ' + metade + '. A partir de ' + BASE_MINIMA + ' respostas ' +
+        'esta tela volta a mostrar médias por item; a comparação entre responsáveis e ' +
+        'alunos volta com ' + BASE_PERFIL + ' respostas em pelo menos dois perfis.</p>' : '') +
+      '<p class="obs">A memória do evento decai a cada semana. Se for enviar, vale ' +
+      'enviar agora.</p>' +
+      '<details><summary>O que as famílias vão ver</summary>' +
+      '<ul style="font-size:13.5px;color:var(--cinza)">' +
+      ITENS_FAM.map(c => '<li>' + esc(ROTULOS[c]) + '</li>').join('') +
+      '<li>Principal ponto positivo (texto livre)</li>' +
+      '<li>Melhoria mais importante (texto livre)</li></ul></details>' +
+      '</section>';
+  }
+
+  const porPerfil = Object.entries(PERFIL)
+    .map(([k, rot]) => r.filter(x => x.perfil === k).length + ' ' + rot).join(' · ');
+  const semPerfil = r.filter(x => !x.perfil).length;
+
+  return blocoVeredito(r, d.convidados, ITENS_FAM, '') +
+    blocoAfirmar(r, d.convidados, ITENS_FAM, { comentarios: 'q6_melhoria' }) +
+    blocoComentarios(r, 'q6_melhoria', 'q6_ponto_forte') +
+    blocoFaixas(r, GRUPOS_FAM) +
+    '<section class="bloco"><h2>Por quem respondeu</h2>' +
+    '<p class="dica">' + porPerfil + (semPerfil ? ' · ' + semPerfil + ' não disseram' : '') +
+    '. A tabela que cruza cada item por perfil volta quando pelo menos dois perfis ' +
+    'tiverem ' + BASE_PERFIL + ' respostas: uma média de um responsável numa célula é ' +
+    'exatamente o erro que esta tela existe para evitar.</p></section>' +
+    blocoAnexo(r, GRUPOS_FAM, blocoLink('avaliacao-familias', d)) +
+    blocoComoLer(r, d.convidados);
+}
+
+/* ============================================================
+   Abertura
+   ============================================================ */
+let DADOS = null;
+let aba = 'uni';
+
+function desenharAbas() {
+  const u = DADOS.universidades.respostas.length;
+  const f = DADOS.familias.respostas.length;
+
+  $('#aba-uni').innerHTML = '<b>Universidades</b><i>' + u + ' ' +
+    plural(u, 'resposta', 'respostas') + '</i>';
+  $('#aba-fam').innerHTML = '<b>Famílias</b><i>' + f + ' ' +
+    plural(f, 'resposta', 'respostas') + '</i>';
+  $('#aba-uni').classList.toggle('zero', u === 0);
+  $('#aba-fam').classList.toggle('zero', f === 0);
+  $('#aba-uni').setAttribute('aria-selected', String(aba === 'uni'));
+  $('#aba-fam').setAttribute('aria-selected', String(aba === 'fam'));
+}
+
+/* A tira fica ACIMA das abas porque não pertence a nenhuma das
+   duas — e porque a impressão esconde as abas, então ela sai nas
+   duas impressões.
+
+   Âmbar e não vermelho: nada está quebrado, falta executar.
+   Vermelho nesta paleta está reservado ao que a pesquisa apontou
+   como defeito. */
+function desenharPendencia() {
+  const f = DADOS.familias;
+  const mostra = f.respostas.length === 0 && f.aberta && f.convidados > 0;
+  $('#pendencia').innerHTML = mostra
+    ? '<div class="pendencia"><b>A pesquisa das famílias ainda não teve nenhuma resposta.</b>' +
+      '<span>' + f.convidados + ' pessoas credenciadas podem responder. O link está aberto.' +
+      '</span><button type="button" id="ir-familias">Ver a aba Famílias</button></div>'
+    : '';
+  const b = $('#ir-familias');
+  if (b) b.addEventListener('click', () => { aba = 'fam'; desenhar(); });
+}
+
+function desenhar() {
+  desenharAbas();
+  $('#conteudo').innerHTML = aba === 'uni'
+    ? telaUniversidades(DADOS.universidades)
+    : telaFamilias(DADOS.familias);
+
+  document.querySelectorAll('.copiar').forEach(b => b.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(b.dataset.url);
+      const antes = b.textContent;
+      b.textContent = 'copiado';
+      setTimeout(() => { b.textContent = antes; }, 2000);
+    } catch (e) {
+      /* Sem permissão de área de transferência: seleciona o
+         endereço para a pessoa copiar com Ctrl+C. */
+      const a = b.previousElementSibling;
+      if (a) { const s = getSelection(); const r = document.createRange();
+               r.selectNodeContents(a); s.removeAllRanges(); s.addRange(r); }
+    }
+  }));
+
+  window.scrollTo(0, 0);
+}
+
+$('#aba-uni').addEventListener('click', () => { aba = 'uni'; desenhar(); });
+$('#aba-fam').addEventListener('click', () => { aba = 'fam'; desenhar(); });
+
+/* details[open] forçado por CSS não é garantido em todos os
+   motores: sem este gancho, o Chrome imprime a página do anexo em
+   branco e a direção descobre na frente da impressora. */
+window.addEventListener('beforeprint', () =>
+  document.querySelectorAll('details').forEach(d => d.open = true));
+
+async function iniciar() {
+  avisar('Carregando…');
+
+  const { data, error } = await sb.rpc('painel_respostas');
+
+  if (error) {
+    const m = (error && error.message) || String(error);
+    /* `sem_permissao` não é falha técnica: é a conta certa para
+       outra tela. Dizer "erro" mandaria procurar defeito onde não há. */
+    if (/sem_permissao/.test(m)) {
+      avisar('Esta tela é da direção. Sua conta não tem esse acesso.', true);
+      await sb.auth.signOut();
+      return;
+    }
+    if (/nao_autenticado/.test(m)) { avisar('Sessão expirada. Entre de novo.', true); return; }
+    avisar('Não consegui carregar as respostas. Tente de novo em instantes.', true);
+    return;
+  }
+
+  DADOS = data;
+
+  /* A RPC das famílias entrega as linhas em ordem de chegada, e
+     ordem de chegada é um vetor de pareamento. Embaralhar aqui,
+     antes de qualquer desenho. */
+  DADOS.familias.respostas = embaralhar(DADOS.familias.respostas || []);
+  DADOS.universidades.respostas = embaralhar(DADOS.universidades.respostas || []);
+
+  avisar('');
+  mostrar($('#acesso'), false);
+  mostrar($('#painel'), true);
+  mostrar($('#sair'), true);
+  desenharPendencia();
+  desenhar();
+}
+
+/* Sessão guardada no aparelho: quem já entrou não digita de novo. */
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) iniciar();
+})();
+</script>
+</body>
+</html>

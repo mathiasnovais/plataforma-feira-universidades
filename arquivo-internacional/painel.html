@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Painel de inscrições — Career Day · Alfa University Fair</title>
+<!-- URL e chave anon do projeto: copie config.exemplo.js para config.js -->
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+  :root { --azul:#1478d0; --vermelho:#b02020; --verde:#0a7d4b; --texto:#201e1d;
+          --cinza:#605d5d; --linha:#e3e0e0; --fundo:#f3f2f2; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--fundo); color:var(--texto);
+         font:15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .env { max-width:1080px; margin:0 auto; padding:26px 20px 60px; }
+
+  header { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between;
+           gap:10px; border-bottom:2px solid var(--texto); padding-bottom:14px; }
+  .marca { font:600 11px/1 -apple-system,"Segoe UI",Roboto,sans-serif; letter-spacing:.16em;
+           text-transform:uppercase; color:var(--vermelho); margin-bottom:8px; }
+  h1 { margin:0; font-size:22px; letter-spacing:-.02em; }
+  .quando { font-size:13px; color:var(--cinza); }
+
+  .cartoes { display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr));
+             gap:12px; margin:22px 0 26px; }
+  .cartao { background:#fff; border:1px solid var(--linha); padding:16px 18px; }
+  .cartao strong { display:block; font-size:31px; line-height:1.05; letter-spacing:-.02em;
+                   font-variant-numeric:tabular-nums; }
+  .cartao span { display:block; font-size:11.5px; text-transform:uppercase; letter-spacing:.08em;
+                 color:var(--cinza); margin-top:5px; }
+  .cartao em { display:block; font-style:normal; font-size:12px; color:var(--cinza); margin-top:6px; }
+  .cartao.destaque { border-color:var(--azul); }
+  .cartao.destaque strong { color:var(--azul); }
+
+  .grade { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px; }
+  section { background:#fff; border:1px solid var(--linha); padding:18px 20px; }
+  h2 { margin:0 0 14px; font-size:12.5px; text-transform:uppercase; letter-spacing:.09em;
+       color:var(--cinza); font-weight:600; }
+
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th { text-align:left; font-weight:400; padding:5px 10px 5px 0; }
+  td.n { width:46px; text-align:right; padding-right:10px; color:var(--cinza);
+         font-variant-numeric:tabular-nums; }
+  td.b { width:100%; }
+  td.b span { display:block; height:9px; background:var(--azul); min-width:2px; }
+
+  .rodape { margin-top:26px; font-size:12.5px; color:var(--cinza); }
+  .estado { padding:40px 0; text-align:center; color:var(--cinza); }
+  .erro { border-left:5px solid var(--vermelho); background:#fff; padding:14px 18px; }
+  .vazio { color:var(--cinza); font-size:13.5px; margin:0; }
+
+  /* ---- acesso ---- */
+  .acesso { background:#fff; border:1px solid var(--linha); padding:16px 20px; margin:22px 0 0; }
+  .acesso h2 { margin-bottom:6px; }
+  .acesso p { margin:0 0 12px; font-size:13.5px; color:var(--cinza); }
+  .acesso .campos { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  .acesso input { padding:9px 11px; font:inherit; font-size:14px; border:1px solid #c9c5c5;
+                  min-width:230px; }
+  .acesso input.codigo { min-width:130px; letter-spacing:.3em; font-variant-numeric:tabular-nums; }
+  .acesso button { padding:9px 18px; font:inherit; font-size:13.5px; font-weight:600;
+                   background:var(--texto); color:#fff; border:0; cursor:pointer; }
+  .acesso button.saiu { background:none; color:var(--cinza); border:1px solid var(--linha);
+                        font-weight:400; }
+  .acesso button:disabled { background:#9aa3af; cursor:default; }
+  .msg { margin:10px 0 0; font-size:13px; }
+  .msg.ok { color:#1f7a3d; }
+  .msg.ruim { color:var(--vermelho); }
+  .oculto { display:none !important; }
+
+  .quem { display:flex; align-items:center; gap:12px; font-size:13px; color:var(--cinza); }
+  .lista th { font-size:11px; text-transform:uppercase; letter-spacing:.07em; color:var(--cinza);
+              border-bottom:1px solid var(--linha); padding:7px 10px 7px 0; }
+  .lista td { padding:7px 10px 7px 0; border-bottom:1px solid #f4f2f2; vertical-align:top;
+              font-size:13.5px; }
+  /* Seis etiquetas, seis matizes distintos. Numa tabela de 400
+     linhas a cor é lida antes da palavra, então duas categorias
+     não podem compartilhar tom — e a diferença entre "da Rede" e
+     "de fora" é a que mais se procura na revisão.
+
+     Só borda e texto coloridos, sem fundo: a etiqueta convive com
+     a linha da tabela e não deve competir com o nome. */
+  .tag { display:inline-block; padding:1px 7px; font-size:11px;
+         border:1px solid var(--linha); white-space:nowrap; }
+  .tag.aluno            { color:var(--cinza); }
+  .tag.aluno-externo    { border-color:#6b3fa0; color:#6b3fa0; }
+  .tag.counselor        { border-color:var(--azul); color:var(--azul); }
+  .tag.docente          { border-color:var(--vermelho); color:var(--vermelho); }
+  .tag.docente-externo  { border-color:#b1670a; color:#b1670a; }
+  .tag.responsavel      { border-color:var(--verde); color:var(--verde); }
+  /* ---- palestras ---- */
+  .palestra-bloco { margin-bottom:22px; }
+  .palestra-bloco:last-child { margin-bottom:0; }
+  .palestra-topo { display:flex; align-items:baseline; justify-content:space-between;
+                   gap:12px; flex-wrap:wrap; }
+  .palestra-topo b { font-size:15px; letter-spacing:-.01em; }
+  .palestra-topo span { font-size:13px; color:var(--cinza); }
+  .palestra-conta { font-variant-numeric:tabular-nums; font-weight:600; white-space:nowrap; }
+  .palestra-conta.cheia { color:var(--vermelho); }
+  /* A barra existe para a pergunta que se faz olhando de longe:
+     "está enchendo?". O número sozinho não responde isso. */
+  .palestra-barra { height:7px; border-radius:999px; background:var(--fundo);
+                    margin:9px 0 12px; overflow:hidden; }
+  .palestra-barra span { display:block; height:100%; background:var(--azul); border-radius:999px; }
+  .palestra-barra span.cheia { background:var(--vermelho); }
+
+  .pend { color:var(--vermelho); }
+  .rolar { max-height:520px; overflow:auto; }
+  section.alerta { border-color:var(--vermelho); }
+  section.alerta h2 { color:var(--vermelho); }
+  .comconta { border-bottom:1px dotted var(--cinza); cursor:help; }</style>
+</head>
+<body>
+<div class="env">
+
+<header>
+  <div>
+    <div class="marca">Career Day – Alfa University Fair · 3ª Edição</div>
+    <h1>Acompanhamento das inscrições</h1>
+  </div>
+  <span class="quando" id="quando">carregando…</span>
+  <!-- A tela do dia é separada de propósito: no balcão se abre uma
+       coisa só, em tela cheia, sem os gráficos do acompanhamento
+       no caminho. -->
+  <a href="credenciamento.html" style="font-size:13px;color:var(--azul)">Credenciamento do dia →</a>
+</header>
+
+<div class="acesso" id="acesso">
+  <div id="deslogado">
+    <h2>Acesso restrito</h2>
+    <p>Este painel é da organização do evento. Informe seu e-mail para receber um código
+       de acesso — só quem já está cadastrado recebe.</p>
+    <div class="campos" id="passo-email">
+      <input type="email" id="email" placeholder="seu.email@exemplo.edu.br" autocomplete="email">
+      <button type="button" id="btn-codigo">Receber código</button>
+    </div>
+    <div class="campos oculto" id="passo-codigo">
+      <!-- maxlength 8: o comprimento do código é configurável no
+           Supabase (Auth > Providers > Email > OTP Length), e este
+           projeto está em 8. Um campo de 6 corta o código e faz o
+           servidor recusar um código correto. -->
+      <input type="text" id="codigo" class="codigo" placeholder="········" inputmode="numeric"
+             maxlength="8" autocomplete="one-time-code">
+      <button type="button" id="btn-entrar">Entrar</button>
+      <button type="button" id="btn-voltar" class="saiu">Trocar e-mail</button>
+    </div>
+    <p class="msg" id="aviso"></p>
+  </div>
+
+  <div id="logado" class="oculto">
+    <div class="quem">
+      <span id="quem-texto"></span>
+      <!-- Só aparece depois que painel_gestor() responde: quem
+           está logado sem papel de gestor vê a caixa de acesso e
+           mais nada, e um botão de exportar ali seria promessa
+           que o banco não cumpre. -->
+      <button type="button" id="btn-exportar" class="oculto">Exportar para Excel</button>
+      <button type="button" id="btn-sair" class="saiu">Sair</button>
+    </div>
+  </div>
+</div>
+
+<div id="conteudo"></div>
+
+
+
+<div id="palestras"></div>
+<div id="detalhe"></div>
+
+<p class="rodape">
+  Contém dado pessoal de menores de idade. Não compartilhe capturas de tela nem exporte
+  a lista sem necessidade.
+  <br>Atualiza sozinha a cada 5 minutos enquanto a sessão estiver aberta.
+</p>
+
+</div>
+
+<script>
+/* A mesma chave pública do formulário. Ela não abre nada por si:
+   a função painel_publico() é a única coisa que esta página
+   chama, e ela devolve só contagens. */
+const SUPABASE_URL = window.CONFIG.SUPABASE_URL;
+const SUPABASE_ANON_KEY = window.CONFIG.SUPABASE_ANON_KEY;
+
+const esc = t => String(t == null ? '' : t)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+const cartao = (valor, rotulo, obs, destaque) => `
+  <div class="cartao${destaque ? ' destaque' : ''}">
+    <strong>${valor}</strong><span>${esc(rotulo)}</span>${obs ? `<em>${esc(obs)}</em>` : ''}
+  </div>`;
+
+function barras(dados, cor) {
+  if (!dados || !dados.length) return '<p class="vazio">Nada ainda.</p>';
+  const max = Math.max(...dados.map(d => d.n));
+  return '<table>' + dados.map(d => `
+    <tr>
+      <th>${esc(d.rotulo)}</th>
+      <td class="n">${d.n}</td>
+      <td class="b"><span style="width:${(d.n / max * 100).toFixed(1)}%${cor ? ';background:' + cor : ''}"></span></td>
+    </tr>`).join('') + '</table>';
+}
+
+const diaCurto = r => r.split('-').reverse().slice(0, 2).join('/');
+
+function desenhar(d) {
+  const t = d.totais;
+  document.getElementById('quando').textContent =
+    'Atualizado às ' + new Date(d.atualizado_em).toLocaleTimeString('pt-BR',
+      { hour: '2-digit', minute: '2-digit' });
+
+  document.getElementById('conteudo').innerHTML = `
+    <div class="cartoes">
+      ${cartao(t.inscricoes, 'inscrições', t.alunos + ' alunos · ' + t.counselors + ' counselors')}
+      ${cartao(d.acompanhantes, 'acompanhantes')}
+      ${cartao(d.crachas.total, 'pessoas no evento', 'inscritos + acompanhantes', true)}
+      ${cartao(t.aprovados, 'já aprovados')}
+      ${cartao(t.pendentes, 'aguardando revisão')}
+      ${d.crachas_levas ? cartao(
+          d.crachas_levas.gerados,
+          'crachás gerados',
+          d.crachas_levas.na_fila
+            ? d.crachas_levas.na_fila + ' esperando a próxima leva'
+            : 'fila vazia' + (d.crachas_levas.ultima ? ' · última: leva ' + d.crachas_levas.ultima : ''),
+          true) : ''}
+      ${d.presenca ? cartao(
+          d.presenca.inscritos_presentes + d.presenca.acompanhantes_presentes,
+          'presentes no evento',
+          'de ' + (d.presenca.inscritos_aprovados + d.presenca.acompanhantes_aprovados) + ' esperados',
+          true) : ''}
+    </div>
+
+    <div class="grade">
+      <section><h2>Por unidade / colégio</h2>${barras(d.por_unidade)}</section>
+      <section><h2>Por ano de escolaridade</h2>${barras(d.por_ano)}</section>
+      <section><h2>Países de interesse</h2>${barras(d.por_pais, 'var(--vermelho)')}</section>
+      <section><h2>Vem acompanhado?</h2>${barras(d.por_acompanhamento)}</section>
+      <section><h2>Inscrições por dia</h2>${
+        barras((d.por_dia || []).map(x => ({ rotulo: diaCurto(x.rotulo), n: x.n })))}</section>
+      <section><h2>Counselors por instituição</h2>${barras(d.por_instituicao_counselor)}</section>
+    </div>`;
+}
+
+/* ============================================================
+   Acesso
+
+   Mesmo login do app do avaliador: e-mail + código de 6 dígitos,
+   entregue pelo n8n. `Enable signup = OFF` no Supabase, então
+   e-mail fora da lista recebe erro em vez de virar usuário novo.
+
+   Quem entra e tem papel 'gestor' passa a chamar painel_gestor(),
+   que devolve os mesmos números MAIS as listas com nome. Quem
+   entra sem o papel recebe 'sem_permissao' e continua vendo só as
+   contagens — a checagem é no banco, não aqui.
+   ============================================================ */
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true }
+});
+
+const $ = s => document.querySelector(s);
+const mostrar = (el, ver) => el.classList.toggle('oculto', !ver);
+
+function aviso(texto, tipo) {
+  const el = $('#aviso');
+  el.textContent = texto || '';
+  el.className = 'msg' + (tipo ? ' ' + tipo : '');
+}
+
+function traduzir(e) {
+  const m = (e && e.message ? e.message : String(e)).toLowerCase();
+  if (m.includes('signups not allowed') || m.includes('not found') || m.includes('invalid login'))
+    return 'Este e-mail não tem acesso. Fale com quem administra o sistema.';
+  if (m.includes('rate') || m.includes('too many')) return 'Muitas tentativas. Aguarde alguns minutos.';
+  if (m.includes('sem_permissao')) return 'Sua conta não tem permissão de gestor.';
+  if (m.includes('failed to fetch')) return 'Sem conexão. Verifique a internet.';
+  /* O Supabase responde "expired or invalid" para três situações
+     diferentes, e a pessoa precisa saber qual é para agir: código
+     velho, código já usado, ou código de um pedido anterior. */
+  if (m.includes('expired') || m.includes('invalid'))
+    return 'Código recusado. Use o do e-mail MAIS RECENTE — pedir um novo invalida o anterior, ' +
+           'e cada código só funciona uma vez. Se já tentou, peça outro.';
+  return e && e.message ? e.message : 'Não foi possível concluir.';
+}
+
+$('#btn-codigo').addEventListener('click', async function () {
+  const email = $('#email').value.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return aviso('Digite um e-mail válido.', 'ruim');
+  this.disabled = true; this.textContent = 'Enviando…';
+  aviso('');
+  try {
+    const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+    if (error) throw error;
+    mostrar($('#passo-email'), false);
+    mostrar($('#passo-codigo'), true);
+    $('#codigo').value = '';
+    $('#codigo').focus();
+    aviso('Código enviado para ' + email + '. Confira também o spam.', 'ok');
+  } catch (e) {
+    aviso(traduzir(e), 'ruim');
+  } finally {
+    this.disabled = false; this.textContent = 'Receber código';
+  }
+});
+
+$('#btn-voltar').addEventListener('click', () => {
+  mostrar($('#passo-codigo'), false);
+  mostrar($('#passo-email'), true);
+  aviso('');
+});
+
+/* O código é de uso único: o servidor o queima na primeira
+   tentativa, dando certo ou não. Sem este trinco, dois cliques
+   seguidos fazem o segundo falhar com "inválido" mesmo estando
+   correto. */
+let verificando = false;
+
+$('#btn-entrar').addEventListener('click', async function () {
+  if (verificando) return;
+  const email = $('#email').value.trim().toLowerCase();
+  /* Só dígitos: colar do e-mail costuma trazer espaço junto, e o
+     servidor recusa "565 336 73" como se fosse código errado. */
+  const token = $('#codigo').value.replace(/\D/g, '');
+  if (token.length < 6) return aviso('Digite o código inteiro que veio no e-mail.', 'ruim');
+
+  verificando = true;
+  this.disabled = true; this.textContent = 'Entrando…';
+  try {
+    const { error } = await sb.auth.verifyOtp({ email, token, type: 'email' });
+    if (error) throw error;
+    aviso('');
+    await carregar();
+  } catch (e) {
+    aviso(traduzir(e), 'ruim');
+    $('#codigo').value = '';   // já queimado no servidor
+    $('#codigo').focus();
+  } finally {
+    verificando = false;
+    this.disabled = false; this.textContent = 'Entrar';
+  }
+});
+
+$('#btn-sair').addEventListener('click', async () => {
+  await sb.auth.signOut();
+  $('#detalhe').innerHTML = '';
+  await carregar();
+});
+
+/* ---- as seções que só existem logado ---- */
+
+/* A etiqueta cruza DUAS informações, não uma:
+
+     tipo         — o papel  (aluno, counselor, docente, responsável)
+     aluno_alfacem — a procedência (Rede ou de fora)
+
+   "Aluno externo" não é um tipo no banco: é um aluno com
+   aluno_alfacem = false. Por isso a função recebe os dois e o
+   banco manda `externo` desde a 0033.
+
+   Counselor não ganha variante: por definição ele vem de outra
+   instituição, e escrever "counselor externo" seria repetir.
+
+   O fallback é 'aluno' porque `tipo` é nulo nas inscrições
+   anteriores à 0014, e todas elas são de alunos. */
+const ROTULOS = {
+  aluno:        { rede: ['aluno', 'aluno'],       fora: ['aluno externo', 'aluno-externo'] },
+  docente:      { rede: ['docente', 'docente'],   fora: ['docente externo', 'docente-externo'] },
+  counselor:    { rede: ['counselor', 'counselor'], fora: ['counselor', 'counselor'] },
+  acompanhante: { rede: ['responsável', 'responsavel'], fora: ['responsável', 'responsavel'] }
+};
+
+const linhaTag = (tipo, externo) => {
+  const familia = ROTULOS[tipo] || ROTULOS.aluno;
+  const [texto, classe] = externo ? familia.fora : familia.rede;
+  return `<span class="tag ${classe}">${texto}</span>`;
+};
+
+function desenharDetalhe(d) {
+  const dia = s => new Date(s).toLocaleDateString('pt-BR');
+
+  const duplicatas = (d.duplicatas || []).length ? `
+    <section class="alerta">
+      <h2>⚠ Possíveis duplicatas — mesmo nome mais de uma vez</h2>
+      <table class="lista">
+        <tr><th>Nome</th><th>Vezes</th><th>Contatos</th></tr>
+        ${d.duplicatas.map(x => `<tr><td>${esc(x.nome)}</td><td>${x.vezes}</td>
+          <td>${esc(x.contatos || '—')}</td></tr>`).join('')}
+      </table>
+    </section>` : '';
+
+  const semContato = (d.sem_contato || []).length ? `
+    <section class="alerta">
+      <h2>⚠ Sem nenhum canal de contato</h2>
+      <p class="vazio">Recebem crachá e aparecem para o representante, mas não há e-mail para salvar.</p>
+      <table class="lista">
+        <tr><th>Nome</th><th>Tipo</th></tr>
+        ${d.sem_contato.map(x => `<tr><td>${esc(x.nome)}</td><td>${linhaTag(x.tipo, x.externo)}</td></tr>`).join('')}
+      </table>
+    </section>` : '';
+
+  const travado = (d.email_travado || []).length ? `
+    <section class="alerta">
+      <h2>⚠ E-mail que não sai sem alguém corrigir</h2>
+      <p class="vazio">Estes não receberam confirmação e não vão receber sozinhos.</p>
+      <table class="lista">
+        <tr><th>Nome</th><th>Destino</th><th>Tentativas</th><th>Motivo</th></tr>
+        ${d.email_travado.map(x => `<tr>
+          <td>${esc(x.nome)}</td>
+          <td>${esc(x.destino || '—')}</td>
+          <td>${x.tentativas}</td>
+          <td>${esc(x.erro || 'endereço fora do formato')}</td>
+        </tr>`).join('')}
+      </table>
+    </section>` : '';
+
+  const acomp = (d.acompanhantes_lista || []).length ? `
+    <section>
+      <h2>Acompanhantes (${d.acompanhantes_lista.length})</h2>
+      <div class="rolar"><table class="lista">
+        <tr><th>Tipo</th><th>Nome</th><th>Parentesco</th><th>Acompanha</th></tr>
+        ${d.acompanhantes_lista.map(x => `<tr>
+          <td>${linhaTag('acompanhante')}</td>
+          <td>${esc(x.nome)}</td>
+          <td>${esc(x.parentesco || '—')}</td><td>${esc(x.de)}</td></tr>`).join('')}
+      </table></div>
+    </section>` : '';
+
+  $('#detalhe').innerHTML = travado + duplicatas + semContato + `
+    <section>
+      <h2>Inscrições (${(d.inscricoes || []).length})</h2>
+      <div class="rolar"><table class="lista">
+        <tr><th>Quando</th><th>Tipo</th><th>Nome</th><th>Onde</th><th>Ano</th>
+            <th>Responsável</th><th>Contato</th><th>Acomp.</th><th>Aprovado</th>
+            <th>Crachá</th><th>E-mail</th></tr>
+        ${(d.inscricoes || []).map(x => `<tr>
+          <td>${esc(dia(x.criado_em))}</td>
+          <td>${linhaTag(x.tipo, x.externo)}</td>
+          <td>${esc(x.nome)}</td>
+          <td>${esc(x.onde || '—')}</td>
+          <td>${esc(x.ano || '—')}</td>
+          <td>${esc(x.responsavel || '—')}</td>
+          <td>${esc(x.contato || '—')}</td>
+          <!-- Uma quebra de linha por nome no title, para o balão
+               do navegador listar em vez de amontoar numa linha.
+               String.fromCharCode(10) e não '\n': este arquivo é
+               reescrito por script de tempos em tempos, e a
+               sequência de escape já foi convertida em quebra de
+               linha de verdade uma vez, derrubando a página. -->
+          <td>${x.acompanhantes
+            ? '<span class="comconta" title="'
+              + esc((x.acompanhantes_nomes || []).join(String.fromCharCode(10)))
+              + '">' + x.acompanhantes + '</span>'
+            : '0'}</td>
+          <td>${x.ativo ? 'sim' : '<span class="pend">pendente</span>'}</td>
+          <!-- Quem ainda não foi aprovado nem chegou a entrar na
+               fila do crachá: dizer "na fila" ali seria mentira,
+               porque gerar-crachas.mjs só olha ativo = true. -->
+          <td>${x.cracha_lote
+            ? 'leva ' + x.cracha_lote
+            : (x.ativo ? '<span class="pend">na fila</span>' : '—')}</td>
+          <td>${x.email_enviado ? 'enviado' : (x.email_erro ? '<span class="pend">falhou</span>' : '<span class="pend">na fila</span>')}</td>
+        </tr>`).join('')}
+      </table></div>
+    </section>` + acomp;
+}
+
+/* Nada é exibido sem sessão de gestor — nem os números. Quem não
+   está logado vê a caixa de acesso e mais nada.
+
+   A tela não é a tranca: painel_gestor() exige o papel no banco,
+   e anon não executa nem ela nem painel_publico (migration 0018).
+   Esconder aqui é para não confundir quem abre, não para
+   proteger. */
+function limpar(mensagem) {
+  $('#quando').textContent = '';
+  $('#conteudo').innerHTML = mensagem
+    ? '<div class="erro">' + mensagem + '</div>' : '';
+  $('#detalhe').innerHTML = '';
+}
+
+/* ============================================================
+   PALESTRAS
+
+   Chamada separada, e não dentro do painel_gestor(): aquela
+   função já foi reescrita três vezes (0028, 0033, e teria de ser
+   de novo aqui), e cada reescrita é uma cópia de 120 linhas que
+   não mudam, com chance de transcrever uma errada.
+
+   O custo é uma ida a mais ao servidor no carregamento do painel,
+   que ninguém percebe.
+   ============================================================ */
+/* O perfil reaproveita as etiquetas da tabela de inscrições — as
+   mesmas cores para as mesmas categorias em toda a página. */
+const tagPerfil = p =>
+    p === 'responsavel' ? '<span class="tag responsavel">responsável</span>'
+  : p === 'externo'     ? '<span class="tag aluno-externo">externo</span>'
+  : '<span class="tag aluno">aluno</span>';
+
+/* O resumo vem contado do banco. Contar de novo aqui seria a
+   segunda fonte do mesmo número — e é assim que duas telas passam
+   a discordar sobre quantos são. */
+function resumoPalestra(r) {
+  if (!r) return '';
+  const partes = [];
+  if (r.alunos)       partes.push(r.alunos + ' aluno' + (r.alunos > 1 ? 's' : ''));
+  if (r.responsaveis) partes.push(r.responsaveis + ' responsáve' + (r.responsaveis > 1 ? 'is' : 'l'));
+  if (r.externos)     partes.push(r.externos + ' externo' + (r.externos > 1 ? 's' : ''));
+  return partes.length
+    ? '<p class="vazio" style="margin:-4px 0 10px">' + esc(partes.join(' · ')) + '</p>'
+    : '';
+}
+
+async function carregarPalestras() {
+  try {
+    const { data, error } = await sb.rpc('lista_palestras');
+    if (error) throw error;
+    if (!data || !data.length) { $('#palestras').innerHTML = ''; return; }
+
+    $('#palestras').innerHTML = `
+      <section>
+        <h2>Inscritos nas palestras</h2>
+        ${data.map(p => {
+          const n = (p.inscritos || []).length;
+          const cheia = n >= p.vagas;
+          const pct = p.vagas ? Math.min(100, n / p.vagas * 100) : 0;
+          return `
+          <div class="palestra-bloco">
+            <div class="palestra-topo">
+              <div>
+                <b>${esc(p.titulo)}</b><br>
+                <span>com ${esc(p.palestrante)}</span>
+              </div>
+              <span class="palestra-conta${cheia ? ' cheia' : ''}">${n} / ${p.vagas}${cheia ? ' · lotada' : ''}</span>
+            </div>
+            <div class="palestra-barra"><span class="${cheia ? 'cheia' : ''}" style="width:${pct.toFixed(1)}%"></span></div>
+            ${resumoPalestra(p.resumo)}
+            ${n ? `<div class="rolar"><table class="lista">
+              <tr><th style="width:34px">#</th><th>Nome</th><th>Perfil</th><th>Contato</th><th>Inscrito em</th></tr>
+              ${p.inscritos.map((i, k) => `<tr>
+                <td>${k + 1}</td>
+                <td>${esc(i.nome)}</td>
+                <td>${tagPerfil(i.perfil)}</td>
+                <td>${esc(i.email)}${i.telefone ? '<br>' + esc(i.telefone) : ''}</td>
+                <td>${esc(new Date(i.em).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }))}</td>
+              </tr>`).join('')}
+            </table></div>` : '<p class="vazio">Ninguém inscrito ainda.</p>'}
+          </div>`;
+        }).join('')}
+      </section>`;
+  } catch (e) {
+    /* Sem a migration 0037 a função não existe. O painel inteiro
+       não pode cair por causa disso — a seção some e o resto
+       continua. */
+    $('#palestras').innerHTML = '';
+  }
+}
+
+async function carregar() {
+  const { data: { session } } = await sb.auth.getSession();
+
+  if (!session) {
+    mostrar($('#deslogado'), true);
+    mostrar($('#logado'), false);
+    limpar('');
+    return;
+  }
+
+  try {
+    const { data, error } = await sb.rpc('painel_gestor');
+    if (error) throw error;
+
+    mostrar($('#deslogado'), false);
+    mostrar($('#logado'), true);
+    $('#quem-texto').textContent = 'Conectado como ' + session.user.email;
+    mostrar($('#btn-exportar'), true);
+    carregarPalestras();
+    desenhar(data);
+    desenharDetalhe(data);
+  } catch (e) {
+    const m = (e && e.message ? e.message : String(e));
+    mostrar($('#deslogado'), false);
+    mostrar($('#logado'), true);
+    $('#quem-texto').textContent = session.user.email;
+    mostrar($('#btn-exportar'), false);
+    $('#palestras').innerHTML = '';
+    limpar(/sem_permissao/.test(m)
+      ? '<b>Sua conta não tem acesso a este painel.</b><br>' +
+        'Ela existe no sistema, mas sem permissão de gestor. Fale com quem administra.'
+      : '<b>Não consegui carregar o painel.</b><br>' + esc(m));
+  }
+}
+
+/* ============================================================
+   Exportação para planilha
+
+   Gera .xlsx de verdade: colunas com largura, número que é
+   número, data que é data e filtro no cabeçalho. O CSV que isto
+   substituiu abria no Excel, mas tudo virava texto — não dava
+   para ordenar por data nem somar acompanhantes.
+
+   A biblioteca é carregada NO CLIQUE, não no carregamento da
+   página. São ~400 KB que só interessam a quem exporta, e o
+   painel é aberto o dia inteiro para olhar números. Mesmo padrão
+   do gerador de crachás com o jsPDF.
+
+   Se a biblioteca não carregar — internet ruim, CDN bloqueada —
+   cai no CSV em vez de falhar. Planilha pior é melhor que
+   planilha nenhuma quando alguém precisa da lista agora.
+   ============================================================ */
+
+const COLUNAS = [
+  ['tipo',                'Tipo'],
+  ['nome',                'Nome'],
+  ['ano',                 'Ano de escolaridade'],
+  ['origem',              'Rede ou externo'],
+  ['unidade',             'Unidade'],
+  ['colegio',             'Colégio externo'],
+  ['responsavel',         'Responsável'],
+  ['resp_email',          'E-mail do responsável'],
+  ['resp_telefone',       'Telefone do responsável'],
+  ['email',               'E-mail próprio'],
+  ['telefone',            'Telefone próprio'],
+  ['paises',              'Países de interesse'],
+  ['acompanhantes',       'Nº de acompanhantes'],
+  ['acompanhantes_nomes', 'Acompanhantes'],
+  ['consentimento',       'Consentimento'],
+  ['aprovado',            'Aprovado'],
+  ['cracha_leva',         'Crachá (leva)'],
+  ['presente',            'Presente'],
+  ['codigo',              'Código do crachá'],
+  ['inscrito_em',         'Inscrito em']
+];
+
+/* Uma célula que começa com = + - @ é lida como FÓRMULA pelo
+   Excel. Os dados vêm de formulário público, então um nome pode
+   trazer isso — por acidente ou de propósito. A aspa simples na
+   frente faz o Excel tratar como texto.
+
+   Telefone com +55 também cai aqui, e é bom que caia: sem isso o
+   Excel tentaria calcular. */
+/* Colunas que devem chegar ao Excel como NÚMERO, não como texto:
+   sem isso não dá para somar acompanhantes nem filtrar por leva,
+   e o Excel alinha tudo à esquerda como se fosse palavra. */
+const NUMERICAS = ['acompanhantes', 'cracha_leva'];
+
+/* A data vem do banco já formatada em horário de Brasília. Vira
+   objeto Date aqui para o Excel tratar como data de verdade —
+   ordenar por "inscrito em" é a primeira coisa que se faz com
+   esta planilha, e com texto a ordem sai alfabética: 01/09 antes
+   de 17/08. */
+function comoData(txt) {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})$/.exec(String(txt || ''));
+  return m ? new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]) : (txt || '');
+}
+
+function valor(chave, bruto) {
+  if (chave === 'inscrito_em') return comoData(bruto);
+  if (NUMERICAS.indexOf(chave) > -1) {
+    return bruto === null || bruto === undefined || bruto === '' ? '' : Number(bruto);
+  }
+  return bruto === null || bruto === undefined ? '' : String(bruto);
+}
+
+function carregarScript(url) {
+  return new Promise((ok, erro) => {
+    const s = document.createElement('script');
+    s.src = url;
+    s.onload = ok;
+    s.onerror = () => erro(new Error('cdn'));
+    document.head.appendChild(s);
+  });
+}
+
+function carimboDeHoje() {
+  const h = new Date();
+  return [String(h.getDate()).padStart(2, '0'),
+          String(h.getMonth() + 1).padStart(2, '0'),
+          h.getFullYear()].join('-');
+}
+
+function baixar(blob, nome) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nome;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+function montarXlsx(dados) {
+  const aoa = [COLUNAS.map(c => c[1])];
+  for (const r of dados) aoa.push(COLUNAS.map(c => valor(c[0], r[c[0]])));
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa, { cellDates: true });
+
+  /* Largura por coluna, medida no conteúdo real. Sem isto tudo sai
+     com 8 caracteres e a primeira coisa que a pessoa faz é
+     arrastar 20 divisórias. O teto de 46 evita que um comentário
+     longo estique a coluna até sumir da tela. */
+  ws['!cols'] = COLUNAS.map((c, i) => {
+    let maior = String(c[1]).length;
+    for (const linha of aoa.slice(1)) {
+      const v = linha[i];
+      const n = v instanceof Date ? 16 : String(v == null ? '' : v).length;
+      if (n > maior) maior = n;
+    }
+    return { wch: Math.min(maior + 2, 46) };
+  });
+
+  const ref = XLSX.utils.encode_range({
+    s: { c: 0, r: 0 },
+    e: { c: COLUNAS.length - 1, r: aoa.length - 1 }
+  });
+  ws['!autofilter'] = { ref: ref };
+
+  /* Não dá para congelar o cabeçalho aqui: a versão community da
+     biblioteca ignora `!freeze` na escrita — testado, o <pane>
+     não sai no arquivo. Quem quiser rolar 370 linhas sem perder
+     os títulos usa Exibir > Congelar Linha Superior no Excel. O
+     filtro do cabeçalho, esse funciona. */
+
+  const iData = COLUNAS.findIndex(c => c[0] === 'inscrito_em');
+  for (let l = 1; l < aoa.length; l++) {
+    const cel = ws[XLSX.utils.encode_cell({ c: iData, r: l })];
+    if (cel && cel.t === 'd') cel.z = 'dd/mm/yyyy hh:mm';
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Inscritos');
+  XLSX.writeFile(wb, 'inscritos-feira-' + carimboDeHoje() + '.xlsx',
+                 { cellDates: true, compression: true });
+}
+
+/* Reserva para quando a biblioteca não carregar.
+
+   Três detalhes decidem se o CSV abre certo no Excel em
+   português: separador `;` (o Excel brasileiro usa vírgula como
+   decimal), BOM no começo (sem ele "João" vira "JoÃ£o") e quebra
+   de linha CRLF. */
+function montarCsv(dados) {
+  const celula = v => {
+    let t = v === null || v === undefined ? '' : String(v);
+    /* Célula que começa com = + - @ é lida como FÓRMULA. Os dados
+       vêm de formulário público, então a aspa simples entra na
+       frente e o Excel trata como texto. */
+    if (/^[=+\-@]/.test(t)) t = "'" + t;
+    return '"' + t.replace(/"/g, '""') + '"';
+  };
+
+  const linhas = [COLUNAS.map(c => celula(c[1])).join(';')];
+  for (const r of dados) linhas.push(COLUNAS.map(c => celula(r[c[0]])).join(';'));
+
+  baixar(new Blob(['﻿' + linhas.join('\r\n') + '\r\n'],
+                  { type: 'text/csv;charset=utf-8' }),
+         'inscritos-feira-' + carimboDeHoje() + '.csv');
+}
+
+async function exportar() {
+  const btn = $('#btn-exportar');
+  const rotulo = 'Exportar para Excel';
+  btn.disabled = true;
+  btn.textContent = 'Gerando…';
+
+  try {
+    const { data, error } = await sb.rpc('exportar_inscritos');
+    if (error) throw error;
+    if (!data || !data.length) throw new Error('Nenhum inscrito para exportar.');
+
+    let formato = 'xlsx';
+    try {
+      if (!window.XLSX) {
+        btn.textContent = 'Carregando…';
+        await carregarScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js');
+      }
+      montarXlsx(data);
+    } catch (e) {
+      montarCsv(data);
+      formato = 'csv';
+    }
+
+    btn.textContent = data.length + ' linhas ✓';
+    if (formato === 'csv') {
+      alert('Não consegui carregar a biblioteca de Excel — provavelmente falta de internet.\n' +
+            'Baixei em CSV, que o Excel também abre.');
+    }
+    setTimeout(() => { btn.textContent = rotulo; }, 4000);
+  } catch (e) {
+    const m = e && e.message ? e.message : String(e);
+    alert(/exportar_inscritos/.test(m)
+      ? 'O banco ainda não tem a função de exportação.\n' +
+        'Rode a migration 0029_exportar_inscritos.sql no SQL Editor.'
+      : 'Não consegui exportar: ' + m);
+    btn.textContent = rotulo;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+$('#btn-exportar').addEventListener('click', exportar);
+
+carregar();
+setInterval(carregar, 5 * 60 * 1000);
+</script>
+</body>
+</html>

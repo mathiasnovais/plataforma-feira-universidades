@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1478d0">
+<title>Palestras · Career Day</title>
+<!-- URL e chave anon do projeto: copie config.exemplo.js para config.js -->
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+
+<style>
+  :root { --azul:#1478d0; --azul-escuro:#0f5ca3; --vermelho:#b02020; --verde:#0a7d4b;
+          --ambar:#8a5a00; --ambar-fundo:#fff4d6;
+          --texto:#201e1d; --cinza:#605d5d; --linha:#dcd9d7; --fundo:#f3f2f2; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--fundo); color:var(--texto);
+         font:16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         -webkit-text-size-adjust:100%; }
+  .faixa { height:5px; background:linear-gradient(90deg,var(--azul),#3aa0f0 60%,var(--vermelho)); }
+  .env { max-width:640px; margin:0 auto; padding:26px 18px 60px; }
+
+  /* Centralização óptica: a florzinha à esquerda é leve e o texto
+     à direita é cheio, então o peso visual cai à direita do meio
+     do arquivo. Este valor é o que o olho aprovou nesta página —
+     as outras usam -6px, com a logo um pouco maior. */
+  .marca { text-align:center; margin-bottom:22px; }
+  .marca img { width:144px; height:auto; transform:translateX(-11px); }
+
+  /* ---- perfil de quem assiste ---- */
+  .perfis { display:flex; gap:8px; flex-wrap:wrap; }
+  .perfis button {
+    flex:1 1 auto; min-height:52px; padding:12px 14px; font:inherit; font-size:15px;
+    background:#fff; color:var(--texto); border:1.5px solid var(--linha);
+    border-radius:13px; cursor:pointer; white-space:nowrap;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .perfis button[aria-pressed="true"] {
+    border-color:var(--azul); background:#e7f1fb; color:var(--azul-escuro); font-weight:650;
+  }
+  .evento { text-align:center; margin:0 0 6px; font-size:11px; letter-spacing:.18em;
+            text-transform:uppercase; color:var(--vermelho); font-weight:600; }
+  h1 { margin:0 0 8px; font-size:27px; letter-spacing:-.02em; text-align:center; line-height:1.15; }
+  .sub { margin:0 0 28px; color:var(--cinza); font-size:15px; text-align:center; }
+
+  /* ---- as duas palestras ---- */
+  .palestra { background:#fff; border:1.5px solid var(--linha); border-radius:16px;
+              padding:20px; margin-bottom:14px; width:100%; text-align:left;
+              font:inherit; cursor:pointer; display:block;
+              transition:border-color .15s ease, transform .06s ease; }
+  .palestra:active { transform:scale(.995); }
+  .palestra[aria-pressed="true"] { border-color:var(--azul); box-shadow:0 0 0 3px #e7f1fb; }
+  .palestra[disabled] { opacity:.55; cursor:not-allowed; }
+  .palestra h2 { margin:0 0 6px; font-size:18px; line-height:1.3; letter-spacing:-.01em; }
+  .palestra .quem { color:var(--cinza); font-size:14px; }
+  .palestra .vagas { display:inline-block; margin-top:12px; padding:4px 11px; border-radius:999px;
+                     font-size:12.5px; font-weight:700; background:#e9f4ec; color:var(--verde); }
+  .palestra .vagas.pouco { background:var(--ambar-fundo); color:var(--ambar); }
+  .palestra .vagas.zero  { background:#fdecea; color:var(--vermelho); }
+
+  label.rotulo { display:block; font-size:13px; font-weight:650; color:var(--cinza);
+                 margin:18px 0 6px; text-transform:uppercase; letter-spacing:.04em; }
+  input { font:inherit; font-size:16px; width:100%; min-height:54px; padding:14px 15px;
+          border:1.5px solid var(--linha); border-radius:13px; background:#fff; color:var(--texto); }
+  input:focus { outline:none; border-color:var(--azul); box-shadow:0 0 0 4px #e7f1fb; }
+
+  button.primario { width:100%; min-height:58px; border:0; border-radius:14px; margin-top:26px;
+                    background:var(--azul); color:#fff; font:inherit; font-size:17px;
+                    font-weight:650; cursor:pointer; box-shadow:0 2px 10px rgba(20,120,208,.25); }
+  button.primario:active { background:var(--azul-escuro); }
+  button.primario:disabled { background:#c3bfbe; box-shadow:none; cursor:default; }
+
+  .aviso { padding:14px 16px; border-radius:12px; margin:16px 0; font-size:15px; line-height:1.45; }
+  .aviso.erro { background:#fdecea; color:var(--vermelho); }
+  .aviso.atencao { background:var(--ambar-fundo); color:var(--ambar); }
+  .aviso:empty { display:none; }
+  .oculto { display:none !important; }
+
+  /* ---- confirmação ---- */
+  .pronto { text-align:center; padding:20px 0; }
+  .pronto .ok { font-size:54px; line-height:1; }
+  .pronto h2 { font-size:22px; margin:16px 0 6px; line-height:1.25; }
+  .pronto .quem { color:var(--cinza); }
+  .pronto .caixa { background:#fff; border:1.5px solid var(--linha); border-radius:14px;
+                   padding:18px; margin:22px 0 0; text-align:left; }
+  .pronto .caixa b { display:block; margin-bottom:4px; }
+  .nota { margin-top:22px; font-size:14px; color:var(--cinza); line-height:1.5; }
+</style>
+</head>
+<body>
+<div class="faixa"></div>
+<div class="env">
+
+  <div class="marca"><img src="logo-email.png" alt="Alfacem Global Academy"></div>
+  <p class="evento">Career Day · Alfa University Fair</p>
+
+  <div id="tela-escolha">
+    <h1>Palestras do evento</h1>
+    <p class="sub">Escolha <b>uma</b> das duas. Cada palestra tem 50 lugares,
+      por ordem de inscrição.</p>
+
+    <div id="aviso" class="aviso"></div>
+
+    <div id="lista">
+      <p class="sub">Carregando as vagas…</p>
+    </div>
+
+    <div id="formulario" class="oculto">
+      <label class="rotulo" for="nome">Nome completo</label>
+      <input id="nome" type="text" autocomplete="name" placeholder="Nome e sobrenome">
+
+      <!-- Perfil de quem vai assistir. Não muda regra de vaga —
+           serve para a organização saber a composição da sala
+           depois. Botões e não <select> porque são três opções
+           curtas e o toque direto é mais rápido que abrir lista. -->
+      <label class="rotulo">Você é</label>
+      <div class="perfis" id="perfis">
+        <button type="button" data-perfil="aluno" aria-pressed="false">Aluno</button>
+        <button type="button" data-perfil="responsavel" aria-pressed="false">Responsável</button>
+        <button type="button" data-perfil="externo" aria-pressed="false">Convidado externo</button>
+      </div>
+
+      <label class="rotulo" for="email">E-mail</label>
+      <input id="email" type="email" inputmode="email" autocomplete="email"
+             autocapitalize="none" spellcheck="false" placeholder="para confirmarmos a vaga">
+
+      <label class="rotulo" for="telefone">Telefone <span style="text-transform:none">(opcional)</span></label>
+      <input id="telefone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(21) 90000-0000">
+
+      <button type="button" class="primario" id="enviar">Confirmar inscrição</button>
+
+      <!-- O e-mail é a identidade. Duas pessoas da mesma família
+           precisam de endereços diferentes, senão a segunda é
+           recusada como repetição — dizer isso aqui evita que
+           descubram pelo erro. -->
+      <p class="nota">A inscrição é individual e permite a participação em apenas uma
+        das palestras. Cada participante deve informar um endereço de e-mail próprio,
+        utilizado para identificar a inscrição.</p>
+    </div>
+  </div>
+
+  <div id="tela-pronto" class="pronto oculto">
+    <div class="ok">✅</div>
+    <h2 id="pronto-titulo"></h2>
+    <p class="quem" id="pronto-quem"></p>
+    <div class="caixa">
+      <b id="pronto-nome"></b>
+      <span id="pronto-email"></span>
+    </div>
+    <p class="nota">Guarde este e-mail. No dia, procure a sala da palestra pelo nome —
+      a organização terá a lista de inscritos na porta.</p>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL      = window.CONFIG.SUPABASE_URL;
+const SUPABASE_ANON_KEY = window.CONFIG.SUPABASE_ANON_KEY;
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+});
+
+const $ = s => document.querySelector(s);
+const esc = t => String(t == null ? '' : t)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const mostrar = (el, ver) => el.classList.toggle('oculto', !ver);
+
+let escolhida = null;
+let perfil = null;
+
+$('#perfis').querySelectorAll('[data-perfil]').forEach(b => {
+  b.addEventListener('click', () => {
+    perfil = b.dataset.perfil;
+    $('#perfis').querySelectorAll('[data-perfil]').forEach(x => {
+      x.setAttribute('aria-pressed', String(x === b));
+    });
+    avisar('');
+  });
+});
+
+function avisar(txt, tipo) {
+  $('#aviso').textContent = txt || '';
+  $('#aviso').className = 'aviso' + (txt ? ' ' + (tipo || 'erro') : '');
+  if (txt) $('#aviso').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+/* ---- as duas palestras ---- */
+async function carregar() {
+  try {
+    const { data, error } = await sb.rpc('palestras_abertas');
+    if (error) throw error;
+    if (!data || !data.length) throw new Error('vazio');
+
+    $('#lista').innerHTML = data.map(p => {
+      const lotada = p.restantes <= 0;
+      /* O aviso de "últimas vagas" só aparece quando é verdade.
+         Contador em toda palestra vira ruído e ninguém acredita
+         quando importa. */
+      const classe = lotada ? 'zero' : (p.restantes <= 10 ? 'pouco' : '');
+      const texto = lotada ? 'Lotada'
+                  : p.restantes <= 10 ? 'Últimas ' + p.restantes + ' vagas'
+                  : p.restantes + ' vagas';
+      return `
+        <button type="button" class="palestra" data-codigo="${esc(p.codigo)}"
+                aria-pressed="false" ${lotada ? 'disabled' : ''}>
+          <h2>${esc(p.titulo)}</h2>
+          <div class="quem">com ${esc(p.palestrante)}</div>
+          <span class="vagas ${classe}">${texto}</span>
+        </button>`;
+    }).join('');
+
+    $('#lista').querySelectorAll('.palestra').forEach(b => {
+      b.addEventListener('click', () => escolher(b));
+    });
+
+    if (data.every(p => p.restantes <= 0)) {
+      avisar('As duas palestras já estão lotadas. Procure a organização no dia do evento.', 'atencao');
+    }
+  } catch (e) {
+    const m = e && e.message ? e.message : String(e);
+    $('#lista').innerHTML = '';
+    avisar(/palestras_abertas|PGRST202|schema cache/.test(m)
+      ? 'As inscrições ainda não foram abertas. Tente de novo em alguns minutos.'
+      : 'Não consegui carregar as palestras: ' + m);
+  }
+}
+
+function escolher(botao) {
+  escolhida = botao.dataset.codigo;
+  $('#lista').querySelectorAll('.palestra').forEach(b => {
+    b.setAttribute('aria-pressed', String(b === botao));
+  });
+  mostrar($('#formulario'), true);
+  avisar('');
+  $('#nome').focus();
+}
+
+/* ---- envio ---- */
+$('#enviar').addEventListener('click', async function () {
+  const nome = $('#nome').value.trim();
+  const email = $('#email').value.trim().toLowerCase();
+
+  if (!escolhida) return avisar('Escolha uma das palestras acima.');
+  if (nome.split(/\s+/).filter(Boolean).length < 2) {
+    return avisar('Informe o nome completo, com sobrenome.');
+  }
+  if (!perfil) return avisar('Informe se você é aluno, responsável ou convidado externo.');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    return avisar('Confira o e-mail digitado.');
+  }
+
+  avisar('');
+  this.disabled = true;
+  this.textContent = 'Confirmando…';
+
+  try {
+    const { data, error } = await sb.rpc('inscrever_palestra', { p_dados: {
+      palestra: escolhida,
+      nome: nome,
+      email: email,
+      perfil: perfil,
+      telefone: $('#telefone').value.trim()
+    }});
+    if (error) throw error;
+
+    if (!data.ok) {
+      /* Recusa esperada não é erro de sistema: a pessoa precisa
+         saber o que aconteceu e o que fazer, não uma mensagem
+         vermelha genérica. */
+      if (data.motivo === 'ja_inscrito') {
+        avisar('Este e-mail já consta inscrito em "' + data.titulo + '". ' +
+               'A inscrição é individual e permite participação em apenas uma palestra. ' +
+               'Para outro participante, informe um e-mail diferente. ' +
+               'Para alterar a palestra, entre em contato com a organização.', 'atencao');
+      } else if (data.motivo === 'lotada') {
+        avisar('"' + data.titulo + '" acabou de lotar. Escolha a outra palestra ' +
+               'na lista acima.', 'atencao');
+        carregar();
+        escolhida = null;
+        mostrar($('#formulario'), false);
+      } else {
+        avisar('Não consegui concluir. Tente de novo.');
+      }
+      this.disabled = false;
+      this.textContent = 'Confirmar inscrição';
+      return;
+    }
+
+    $('#pronto-titulo').textContent = data.titulo;
+    $('#pronto-quem').textContent = 'com ' + data.palestrante;
+    $('#pronto-nome').textContent = nome;
+    $('#pronto-email').textContent = email;
+    mostrar($('#tela-escolha'), false);
+    mostrar($('#tela-pronto'), true);
+    window.scrollTo(0, 0);
+  } catch (e) {
+    const m = e && e.message ? e.message : String(e);
+    avisar(
+      /nome_incompleto/.test(m)   ? 'Informe o nome completo, com sobrenome.' :
+      /email_invalido/.test(m)    ? 'Confira o e-mail informado.' :
+      /perfil_invalido/.test(m)   ? 'Informe se você é aluno, responsável ou convidado externo.' :
+      /palestra_invalida/.test(m) ? 'Esta palestra não está mais aberta. Atualize a página.' :
+      /muitas_tentativas/.test(m)
+        ? 'Foram registradas muitas inscrições deste local nos últimos minutos. ' +
+          'Aguarde alguns minutos e tente novamente — os dados preenchidos permanecem.' :
+      /inscrever_palestra|PGRST202/.test(m)
+        ? 'As inscrições ainda não foram abertas. Tente de novo em alguns minutos.'
+        : 'Não consegui inscrever: ' + m);
+    this.disabled = false;
+    this.textContent = 'Confirmar inscrição';
+  }
+});
+
+carregar();
+</script>
+</body>
+</html>

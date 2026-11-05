@@ -1,0 +1,82 @@
+{
+  "name": "Manter Supabase ativo",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 9,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "b1000000-0000-4000-8000-000000000001",
+      "name": "Todo dia às 9h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -200,
+        0
+      ],
+      "notes": "Diário é folga suficiente: a pausa do free tier leva dias."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://SEU-PROJETO.supabase.co/rest/v1/rpc/ping",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "headerParameters": {
+          "parameter": [
+            {
+              "name": "apikey",
+              "value": "COLE_AQUI_CHAVE_ANON"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "b1000000-0000-4000-8000-000000000002",
+      "name": "Chamar ping()",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        40,
+        0
+      ],
+      "notes": "Chave anon — é pública por desenho, ping() não lê dado nenhum. ATUALIZE se rotacionar o JWT secret."
+    }
+  ],
+  "connections": {
+    "Todo dia às 9h": {
+      "main": [
+        [
+          {
+            "node": "Chamar ping()",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "all"
+  },
+  "pinData": {}
+}

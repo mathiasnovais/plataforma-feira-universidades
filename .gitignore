@@ -1,0 +1,44 @@
+# Configuração real (URL e chave do projeto)
+config.js
+publicar/config.js
+arquivo-internacional/config.js
+
+# Segredos
+.env
+.env.*
+!.env.exemplo
+!.env.example
+.dev.vars
+segredo*
+*.pem
+
+# Dados pessoais (planilhas, listas, saídas geradas)
+saida/
+*.xlsx
+*.xls
+*.csv
+*.pdf
+*.docx
+cadastro_alunos*
+representantes*
+gestores*
+producao*
+universidades*
+
+# Pasta de publicação (gerada por scripts/preparar-deploy.mjs)
+publicar/
+
+# Ferramentas e lixo
+node_modules/
+.wrangler/
+.vscode/
+supabase/.temp/
+supabase/.branches/
+*.bak*
+_backup*
+_bak*
+_original/
+*.zip
+*.log
+Thumbs.db
+.DS_Store

@@ -1,0 +1,178 @@
+{
+  "name": "Enviar confirmação de inscrição",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "id": "c7d4e9f0-0000-4000-8000-000000000000",
+      "name": "A cada 10 minutos",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -300,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://SEU-PROJETO.supabase.co/rest/v1/rpc/emails_pendentes",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "headerParameters": {
+          "parameter": [
+            {
+              "name": "apikey",
+              "value": "COLE_AQUI_CHAVE_ANON"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={ \"p_token\": \"COLE_AQUI_O_TOKEN_N8N\" }",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "c7d4e9f1-0000-4000-8000-000000000001",
+      "name": "Buscar fila",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -80,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "/* ============================================================\n   Monta um e-mail por inscricao pendente.\n\n   Aceita a fila em qualquer das tres formas que o n8n pode\n   entregar, conforme a versao e a configuracao do no HTTP:\n     - um item por elemento (o no dividiu o array)\n     - um item unico cujo json E o array\n     - um item unico com o array dentro de .data\n   Sem isso o workflow quebra em silencio quando a versao do n8n\n   muda de comportamento.\n\n   O texto e montado aqui, e nao no no de e-mail, porque muda\n   conforme o tipo da inscricao e expressao longa dentro do no de\n   e-mail e ilegivel.\n   ============================================================ */\n\nconst EVENTO  = 'Career Day – Alfa University Fair';\nconst QUANDO  = '22 de agosto de 2026, das 9h as 12h';\nconst ONDE    = 'Alfacem Global Academy · Americas — Av. das Americas, 6551, Barra da Tijuca, Rio de Janeiro';\nconst CHEGADA = 'O credenciamento abre as 8h50, no 3o andar.';\n\nconst linhas = [];\nfor (const item of $input.all()) {\n  const j = item.json;\n  if (Array.isArray(j)) linhas.push(...j);\n  else if (j && Array.isArray(j.data)) linhas.push(...j.data);\n  else if (j && j.id) linhas.push(j);\n}\n\nconst esc = (t) => String(t == null ? '' : t)\n  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\nreturn linhas.map((d) => {\n  const counselor = d.tipo === 'counselor';\n\n  const quem = counselor\n    ? '<p style=\"margin:0 0 16px\">Sua inscricao como <strong>College Counselor</strong> pela instituicao <strong>' + esc(d.instituicao) + '</strong> foi recebida.</p>'\n    : '<p style=\"margin:0 0 16px\">A inscricao de <strong>' + esc(d.aluno) + '</strong>' + (d.ano ? ' (' + esc(d.ano) + ')' : '') + ' foi recebida.</p>';\n\n  const acomp = (d.acompanhantes && d.acompanhantes.length)\n    ? '<p style=\"margin:0 0 16px\">Acompanhantes inscritos: <strong>' + esc(d.acompanhantes.join(', ')) + '</strong>. Cada um recebera o proprio cracha.</p>'\n    : '';\n\n  const html = '<div style=\"font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#201e1d;line-height:1.6\">'\n    + '<p style=\"margin:0 0 4px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#b02020\">' + EVENTO + ' · 3a Edicao</p>'\n    + '<h2 style=\"margin:0 0 20px;font-size:22px\">Inscricao confirmada</h2>'\n    + '<p style=\"margin:0 0 16px\">Ola, ' + esc(d.destinatario) + '.</p>'\n    + quem + acomp\n    + '<div style=\"background:#fff2ef;border-left:5px solid #ec3013;padding:16px 18px;margin:0 0 20px\">'\n    +   '<p style=\"margin:0 0 10px\"><strong>Quando:</strong> ' + QUANDO + '</p>'\n    +   '<p style=\"margin:0 0 10px\"><strong>Onde:</strong> ' + ONDE + '</p>'\n    +   '<p style=\"margin:0\"><strong>Chegada:</strong> ' + CHEGADA + '</p>'\n    + '</div>'\n    + '<h3 style=\"margin:0 0 8px;font-size:16px\">Seu cracha</h3>'\n    + '<p style=\"margin:0 0 16px\">O cracha e entregue <strong>no dia do evento</strong>, no credenciamento. Nao e preciso imprimir nada.</p>'\n    + '<p style=\"margin:0 0 20px\">Cada cracha traz um <strong>QR code</strong>. E por ele que os representantes das universidades registram o contato durante a feira — basta apresenta-lo ao conversar com cada instituicao.</p>'\n    + '<p style=\"margin:0 0 6px;font-size:14px;color:#605d5d\">Protocolo desta inscricao: <strong>' + esc(d.protocolo) + '</strong></p>'\n    + '<p style=\"margin:0;font-size:14px;color:#605d5d\">Guarde este e-mail. Se precisar corrigir alguma informacao, responda a esta mensagem citando o protocolo.</p>'\n    + '</div>';\n\n  return { json: { id: d.id, destino: d.destino, assunto: 'Inscricao confirmada — ' + EVENTO, html: html } };\n});"
+      },
+      "id": "c7d4e9f2-0000-4000-8000-000000000002",
+      "name": "Montar e-mail",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        140,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "sendTo": "={{ $json.destino }}",
+        "subject": "={{ $json.assunto }}",
+        "emailType": "html",
+        "message": "={{ $json.html }}",
+        "options": {
+          "senderName": "Career Day · Alfa University Fair"
+        }
+      },
+      "id": "c7d4e9f3-0000-4000-8000-000000000003",
+      "name": "Enviar e-mail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        360,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://SEU-PROJETO.supabase.co/rest/v1/rpc/marcar_email_enviado",
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "headerParameters": {
+          "parameter": [
+            {
+              "name": "apikey",
+              "value": "COLE_AQUI_CHAVE_ANON"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={ \"p_token\": \"COLE_AQUI_O_TOKEN_N8N\", \"p_id\": \"{{ $('Montar e-mail').item.json.id }}\" }",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "c7d4e9f4-0000-4000-8000-000000000004",
+      "name": "Marcar como enviado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        580,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "A cada 10 minutos": {
+      "main": [
+        [
+          {
+            "node": "Buscar fila",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar fila": {
+      "main": [
+        [
+          {
+            "node": "Montar e-mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar e-mail": {
+      "main": [
+        [
+          {
+            "node": "Enviar e-mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar e-mail": {
+      "main": [
+        [
+          {
+            "node": "Marcar como enviado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

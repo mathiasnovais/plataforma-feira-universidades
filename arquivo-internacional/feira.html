@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1478d0">
+<title>Inscrição no local · Career Day</title>
+<!-- URL e chave anon do projeto: copie config.exemplo.js para config.js -->
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+
+<style>
+  :root { --azul:#1478d0; --azul-escuro:#0f5ca3; --vermelho:#b02020;
+          --texto:#201e1d; --cinza:#605d5d; --linha:#dcd9d7; --fundo:#f3f2f2; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--fundo); color:var(--texto);
+         font:16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         -webkit-text-size-adjust:100%; }
+  .env { max-width:520px; margin:0 auto; padding:24px 18px 60px; }
+
+  .marca { text-align:center; margin-bottom:20px; }
+  /* Centralização óptica: a marca é uma florzinha fina à esquerda
+     e um texto cheio à direita, então o peso visual cai à direita
+     do meio do arquivo e centralizar pelo pixel parece torto.
+     Os 6px são os mesmos do index.html — as duas telas mostram a
+     mesma marca e precisam concordar. */
+  .marca img { width:150px; height:auto; transform:translateX(-6px); }
+  h1 { margin:0 0 6px; font-size:25px; letter-spacing:-.02em; text-align:center; }
+  .sub { margin:0 0 26px; color:var(--cinza); font-size:15px; text-align:center; }
+
+  label.rotulo { display:block; font-size:13px; font-weight:650; color:var(--cinza);
+                 margin:18px 0 6px; text-transform:uppercase; letter-spacing:.04em; }
+  /* 16px no campo: abaixo disso o Safari do iPhone dá zoom
+     sozinho ao focar e desalinha a tela no meio do preenchimento. */
+  input, select { font:inherit; font-size:16px; width:100%; min-height:54px;
+                  padding:14px 15px; border:1.5px solid var(--linha); border-radius:13px;
+                  background:#fff; color:var(--texto); }
+  input:focus, select:focus { outline:none; border-color:var(--azul);
+                              box-shadow:0 0 0 4px #e7f1fb; }
+  .dica { font-size:13px; color:var(--cinza); margin:6px 0 0; }
+
+  button { font:inherit; cursor:pointer; border:0; border-radius:14px; }
+  .primario { width:100%; min-height:58px; background:var(--azul); color:#fff;
+              font-size:17px; font-weight:650; margin-top:26px;
+              box-shadow:0 2px 10px rgba(20,120,208,.25); }
+  .primario:active { background:var(--azul-escuro); }
+  .primario:disabled { background:#c3bfbe; box-shadow:none; cursor:default; }
+  .link { background:none; color:var(--azul); font-weight:600; padding:10px 0;
+          font-size:15px; width:100%; }
+
+  .aviso { padding:14px 16px; border-radius:12px; margin:16px 0; font-size:15px; }
+  .aviso.erro { background:#fdecea; color:var(--vermelho); }
+  .aviso:empty { display:none; }
+
+  .acomp-linha { display:flex; gap:8px; align-items:flex-start; margin-bottom:8px; }
+  .acomp-linha input { flex:1; min-width:0; }
+  .acomp-linha button { flex:none; width:54px; min-height:54px; background:#fff;
+                        border:1.5px solid var(--linha); color:var(--vermelho); font-size:20px; }
+
+  .oculto { display:none !important; }
+
+  /* ---- tela de sucesso ---- */
+  .pronto { text-align:center; padding:30px 0; }
+  .pronto .marca-ok { font-size:56px; line-height:1; }
+  .pronto h2 { font-size:24px; margin:16px 0 8px; }
+  .pronto .codigo { display:inline-block; margin:18px 0 0; font-size:26px; font-weight:700;
+                    letter-spacing:.22em; font-family:ui-monospace, Consolas, monospace;
+                    background:#fff; border:1.5px solid var(--linha); border-radius:12px;
+                    padding:12px 20px; }
+  .pronto p { color:var(--cinza); }
+  .destaque { background:#fff4d6; color:#8a5a00; border-radius:12px; padding:16px;
+              margin-top:24px; font-size:15px; line-height:1.5; text-align:left; }
+</style>
+</head>
+<body>
+<div class="env">
+
+  <div class="marca"><img src="logo-email.png" alt="Alfacem Global Academy"></div>
+
+  <div id="formulario">
+    <h1>Inscrição no local</h1>
+    <p class="sub">Preencha e leve o celular até a mesa de credenciamento.</p>
+
+    <div id="aviso" class="aviso"></div>
+
+    <label class="rotulo" for="tipo">Quem está se inscrevendo</label>
+    <select id="tipo">
+      <option value="aluno-rede">Aluno da Rede Alfacem Global Academy</option>
+      <option value="aluno-externo">Aluno de outro colégio</option>
+      <option value="counselor">College Counselor externo</option>
+      <option value="docente">Docente da Rede Alfacem Global Academy</option>
+    </select>
+
+    <label class="rotulo" for="nome">Nome completo</label>
+    <input id="nome" type="text" autocomplete="name" placeholder="Nome e sobrenome">
+
+    <label class="rotulo" for="onde"><span id="rotulo-onde">Unidade</span></label>
+    <input id="onde" type="text" autocomplete="off" placeholder="Ex.: Barra Américas">
+
+    <div id="bloco-ano">
+      <label class="rotulo" for="ano">Ano de escolaridade</label>
+      <input id="ano" type="text" autocomplete="off" placeholder="Ex.: 2ª Série do Ensino Médio">
+    </div>
+
+    <label class="rotulo" for="email">E-mail</label>
+    <input id="email" type="email" inputmode="email" autocomplete="email"
+           autocapitalize="none" spellcheck="false" placeholder="para receber contato depois">
+
+    <label class="rotulo" for="telefone">Telefone</label>
+    <input id="telefone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(21) 90000-0000">
+
+    <div id="bloco-acomp">
+      <label class="rotulo">Quem veio com você</label>
+      <p class="dica" style="margin:-2px 0 10px">Cada acompanhante recebe crachá próprio. Deixe em branco se veio sozinho.</p>
+      <div id="acomp"></div>
+      <button type="button" class="link" id="mais-acomp">+ adicionar acompanhante</button>
+    </div>
+
+    <button type="button" class="primario" id="enviar">Enviar inscrição</button>
+    <p class="dica" style="text-align:center;margin-top:14px">
+      Ao enviar, você concorda que seus dados sejam usados pela organização do evento
+      e mostrados aos representantes de universidades que escanearem seu crachá.
+    </p>
+  </div>
+
+  <div id="pronto" class="pronto oculto">
+    <div class="marca-ok">✅</div>
+    <h2>Inscrição feita!</h2>
+    <p id="pronto-nome"></p>
+    <div class="codigo" id="pronto-codigo"></div>
+    <div class="destaque">
+      <b>Vá até a mesa de credenciamento.</b> Diga seu nome — ou mostre este código —
+      para receber a credencial e a folha com o seu QR, que os representantes das
+      universidades vão escanear.
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL      = window.CONFIG.SUPABASE_URL;
+const SUPABASE_ANON_KEY = window.CONFIG.SUPABASE_ANON_KEY;
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+});
+
+const $ = s => document.querySelector(s);
+
+/* A chave vem no endereço do QR: .../feira.html#CHAVE
+
+   No hash e não em ?query de propósito: o que vem depois do #
+   não é enviado ao servidor nem aparece em log de acesso. Ela
+   viaja no aparelho de quem escaneou e para por aí. */
+const CHAVE = decodeURIComponent((location.hash || '').replace(/^#/, '').trim());
+
+function avisar(txt) {
+  $('#aviso').textContent = txt || '';
+  $('#aviso').className = 'aviso' + (txt ? ' erro' : '');
+  if (txt) $('#aviso').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+/* ---- o formulário muda conforme o perfil ---- */
+function ajustarCampos() {
+  const t = $('#tipo').value;
+  const aluno = t === 'aluno-rede' || t === 'aluno-externo';
+
+  $('#rotulo-onde').textContent =
+      t === 'aluno-externo' ? 'Em qual colégio estuda'
+    : t === 'counselor'     ? 'De qual instituição você é'
+    : 'Unidade';
+
+  $('#onde').placeholder = (t === 'aluno-externo' || t === 'counselor')
+    ? 'Nome da instituição' : 'Ex.: Barra Américas';
+
+  /* Counselor e docente vêm a trabalho: não têm série nem
+     acompanhante, e mostrar os dois campos só rende dúvida na
+     fila. */
+  $('#bloco-ano').classList.toggle('oculto', !aluno);
+  $('#bloco-acomp').classList.toggle('oculto', !aluno);
+}
+$('#tipo').addEventListener('change', ajustarCampos);
+
+/* ---- acompanhantes ---- */
+function linhaAcomp() {
+  if ($('#acomp').children.length >= 3) {
+    avisar('O limite é 3 acompanhantes por inscrito.');
+    return;
+  }
+  const div = document.createElement('div');
+  div.className = 'acomp-linha';
+  div.innerHTML =
+    '<input type="text" placeholder="Nome completo do acompanhante" autocomplete="off">' +
+    '<button type="button" title="remover">×</button>';
+  div.querySelector('button').addEventListener('click', () => div.remove());
+  $('#acomp').appendChild(div);
+  div.querySelector('input').focus();
+}
+$('#mais-acomp').addEventListener('click', linhaAcomp);
+
+/* ---- envio ---- */
+$('#enviar').addEventListener('click', async function () {
+  const t = $('#tipo').value;
+  const nome = $('#nome').value.trim();
+
+  if (!CHAVE) {
+    return avisar('Este link não é o do cartaz do evento. Escaneie o QR no local.');
+  }
+  if (nome.split(/\s+/).filter(Boolean).length < 2) {
+    return avisar('Escreva o nome completo, com sobrenome.');
+  }
+  if (!$('#onde').value.trim()) {
+    return avisar('Informe ' + $('#rotulo-onde').textContent.toLowerCase() + '.');
+  }
+
+  avisar('');
+  this.disabled = true;
+  this.textContent = 'Enviando…';
+
+  const acompanhantes = [...$('#acomp').querySelectorAll('input')]
+    .map(i => ({ nome: i.value.trim() }))
+    .filter(a => a.nome);
+
+  try {
+    const { data, error } = await sb.rpc('inscrever_na_feira', { p_dados: {
+      chave: CHAVE,
+      tipo: t === 'counselor' ? 'counselor' : t === 'docente' ? 'docente' : 'aluno',
+      da_rede: t !== 'aluno-externo' && t !== 'counselor',
+      nome: nome,
+      onde: $('#onde').value.trim(),
+      ano: $('#ano').value.trim(),
+      email: $('#email').value.trim(),
+      telefone: $('#telefone').value.trim(),
+      acompanhantes: acompanhantes
+    }});
+    if (error) throw error;
+
+    $('#pronto-nome').textContent = data.nome;
+    $('#pronto-codigo').textContent = data.codigo;
+    $('#formulario').classList.add('oculto');
+    $('#pronto').classList.remove('oculto');
+    window.scrollTo(0, 0);
+  } catch (e) {
+    const m = (e && e.message ? e.message : String(e));
+    avisar(
+      /chave_invalida/.test(m)   ? 'Este link não é válido. Escaneie o QR no cartaz do evento.' :
+      /muitas_tentativas/.test(m)? 'Muitos envios deste aparelho. Espere alguns minutos ou procure a mesa de credenciamento.' :
+      /nome_incompleto/.test(m)  ? 'Escreva o nome completo, com sobrenome.' :
+      /email_invalido/.test(m)   ? 'Confira o e-mail digitado.' :
+      /inscrever_na_feira/.test(m) ? 'O sistema ainda não está pronto para inscrição no local. Procure a mesa.' :
+      'Não consegui enviar: ' + m
+    );
+    this.disabled = false;
+    this.textContent = 'Enviar inscrição';
+  }
+});
+
+ajustarCampos();
+linhaAcomp();
+</script>
+</body>
+</html>

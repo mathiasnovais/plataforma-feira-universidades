@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10233f">
+<title>Pesquisa de Feedback · International University Fair</title>
+<!-- URL e chave anon do projeto: copie config.exemplo.js para config.js -->
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+
+<style>
+/* ============================================================
+   Mesma identidade do e-mail de agradecimento e da pesquisa das
+   universidades: fundo cinza-azulado, cartão branco de 700px,
+   marinho, vermelho e âmbar da marca.
+
+   Diferença desta peça: só português. Quem responde é família da
+   rede, no Rio. Inglês ao lado seria enfeite roubando espaço na
+   tela do celular.
+   ============================================================ */
+  :root {
+    --marinho:#10233f; --marinho-2:#16213f; --azul:#1f6fc0;
+    --vermelho:#c8102e; --ambar:#f5b52a; --ambar-fundo:#fdf3dd;
+    --areia:#faf6ee; --texto:#2c3a52; --cinza:#5c6b80;
+    --linha:#dfe5ec; --fundo:#eef1f5;
+
+    /* Quanto do topo da arte é mostrado. A imagem traz, embaixo,
+       uma tarja vermelha escrita "Nosso agradecimento às
+       universidades participantes" — texto do e-mail, não desta
+       pesquisa. 0.66 corta a tarja e mantém logo, data e título. */
+    --topo-visivel:0.66;
+  }
+
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { margin:0; background:var(--fundo); color:var(--texto);
+         font:16px/1.6 'Poppins','Segoe UI',Arial,Helvetica,sans-serif;
+         -webkit-text-size-adjust:100%; }
+
+  .folha { max-width:700px; margin:0 auto; background:#fff;
+           box-shadow:0 2px 18px rgba(16,35,63,.08); }
+  .corpo { padding:30px 40px 44px; }
+
+  .topo { position:relative; width:100%; overflow:hidden; line-height:0;
+          padding-bottom:28.3%;
+          padding-bottom:calc(600 / 1400 * var(--topo-visivel) * 100%); }
+  .topo img { position:absolute; top:0; left:0; width:100%; height:auto; border:0; }
+
+  .faixa { background:var(--vermelho); color:#fff; text-align:center;
+           padding:15px 24px; }
+  .faixa .t { display:block; font-size:15.5px; font-weight:700; letter-spacing:.2px; }
+  .faixa .s { display:block; font-size:13px; font-weight:700; opacity:.92; margin-top:3px; }
+
+  .rodape-arte { display:block; width:100%; height:auto; border:0; }
+
+  .abertura { background:var(--areia); border-left:4px solid var(--vermelho);
+              padding:18px 22px; margin-bottom:22px; }
+  .abertura p { margin:0; font-size:13.5px; line-height:1.7; }
+  .abertura .tempo { margin-top:9px; font-size:12.5px; color:var(--cinza); font-weight:700; }
+
+  .anonima { margin:0 0 26px; padding:13px 18px; background:#f2f6fb;
+             border-left:4px solid var(--azul); font-size:12.5px; line-height:1.65;
+             font-weight:700; color:var(--marinho); }
+
+  /* ---- progresso e etapa ---- */
+  .progresso { margin:0 0 8px; }
+  .trilha { height:8px; background:#e4e9f0; border-radius:99px; overflow:hidden;
+            display:flex; gap:2px; }
+  .trilha span { flex:1; background:#e4e9f0; transition:background .25s ease; }
+  .trilha span.feito { background:var(--vermelho); }
+  .trilha span.atual { background:var(--marinho); }
+
+  .estagio { margin:20px 0 22px; padding:16px 20px; background:var(--marinho);
+             color:#fff; }
+  .estagio .conta { display:block; font-size:10.5px; letter-spacing:2.5px;
+                    text-transform:uppercase; color:var(--ambar); font-weight:700; }
+  .estagio .nome { display:block; font-size:16px; font-weight:700; margin-top:6px; }
+
+  /* ---- pergunta ---- */
+  .pergunta { border:1px solid var(--linha); border-top:3px solid var(--marinho);
+              margin-bottom:18px; }
+  .pergunta > .cabeca { padding:16px 20px 14px; background:#fff;
+                        border-bottom:1px solid var(--linha); }
+  .pergunta .num { display:inline-block; min-width:34px; padding:3px 9px;
+                   background:var(--marinho); color:#fff; font-size:12.5px;
+                   font-weight:700; text-align:center; margin-bottom:9px; }
+  .pergunta .titulo { display:block; font-size:15px; font-weight:700;
+                      color:var(--marinho); line-height:1.45; }
+  .pergunta .ajuda { margin:10px 0 0; font-size:12px; line-height:1.6;
+                     color:var(--cinza); font-weight:700; }
+  .pergunta > .miolo { padding:16px 20px 20px; background:#fcfdfe; }
+
+  .item { border:1px solid var(--linha); background:#fff; padding:13px 15px 15px;
+          margin-bottom:12px; }
+  .item:last-child { margin-bottom:0; }
+  .item .rot { display:flex; align-items:flex-start; margin-bottom:11px; }
+  .item .subnum { display:inline-block; min-width:32px; padding:2px 8px;
+                  background:var(--ambar-fundo); color:#9a6b06; font-size:11.5px;
+                  font-weight:700; text-align:center; margin-right:9px;
+                  flex:none; }
+  .item .rotulo { flex:1 1 auto; min-width:0; font-size:14px; font-weight:700;
+                  color:var(--marinho); line-height:1.35; }
+
+  /* ---- escala ----
+     Botão de 62px de altura: alvo de toque confortável no celular,
+     onde rádio nativo (20px) faz errar a linha. */
+  .escala { display:grid; grid-template-columns:repeat(5,1fr); gap:7px; }
+  .escala button { min-height:70px; background:#fff;
+                   border:1.5px solid var(--linha); border-radius:6px;
+                   font:inherit; color:var(--marinho); line-height:1.25;
+                   padding:8px 6px; cursor:pointer; transition:all .15s ease; }
+  .escala button .n { display:block; font-size:17px; font-weight:700; }
+  .escala button .l { display:block; font-size:11.5px; font-weight:700; margin-top:3px; }
+  .escala button:hover { border-color:var(--marinho); }
+  .escala button[aria-pressed="true"] { background:var(--marinho);
+                                        border-color:var(--marinho); color:#fff; }
+
+  .escala.perfil { grid-template-columns:repeat(3,1fr); }
+  .escala.perfil button { min-height:56px; }
+  .escala.perfil button .l { font-size:13px; margin-top:0; }
+
+  textarea { font:inherit; font-size:16px; width:100%; min-height:104px;
+             padding:12px 14px; border:1.5px solid var(--linha); border-radius:6px;
+             background:#fff; color:var(--texto); resize:vertical; }
+  textarea:focus { outline:none; border-color:var(--marinho);
+                   box-shadow:0 0 0 3px rgba(16,35,63,.08); }
+
+  /* ---- navegação ---- */
+  .navegacao { display:flex; gap:12px; margin-top:24px; }
+  .navegacao button { flex:1; min-height:56px; font:inherit; font-size:15px;
+                      font-weight:700; border-radius:6px; cursor:pointer;
+                      padding:8px 10px; }
+  .voltar { background:#fff; border:1.5px solid var(--linha); color:var(--cinza); }
+  .voltar:disabled { opacity:.4; cursor:default; }
+  .avancar { background:var(--marinho); border:0; color:#fff; }
+  .avancar:active { background:var(--marinho-2); }
+  .enviar { background:var(--vermelho); border:0; color:#fff; }
+  .enviar:disabled { background:#8c1020; opacity:.8; cursor:default; }
+
+  .aviso { padding:14px 18px; margin:0 0 20px; font-size:13.5px; line-height:1.6;
+           font-weight:700; border-left:4px solid; }
+  .aviso.erro { background:#fdecea; border-color:var(--vermelho); color:#8c1020; }
+  .aviso.info { background:var(--ambar-fundo); border-color:var(--ambar); color:#9a6b06; }
+  .aviso:empty { display:none; }
+
+  .oculto { display:none !important; }
+
+  .pronto { text-align:center; padding:46px 10px; }
+  .pronto .marca-ok { font-size:52px; line-height:1; color:var(--vermelho); }
+  .pronto .titulo { display:block; font-size:20px; font-weight:700;
+                    color:var(--marinho); margin-top:14px; }
+  .pronto .detalhe { margin-top:14px; font-size:13.5px; line-height:1.7;
+                     color:var(--cinza); }
+
+  .assinatura { background:var(--areia); padding:20px 40px; font-size:12.5px;
+                line-height:1.6; color:var(--cinza); text-align:center; }
+  .assinatura b { color:var(--marinho); }
+
+  @media (max-width:600px) {
+    .corpo { padding:22px 18px 34px; }
+    .assinatura { padding:18px; }
+    .escala { grid-template-columns:repeat(2,1fr); }
+    .escala.perfil { grid-template-columns:repeat(3,1fr); }
+    .navegacao { flex-direction:column-reverse; }
+  }
+</style>
+</head>
+<body>
+<div class="folha">
+
+  <div class="topo"><img src="topo-feira.jpg" alt="International University Fair · Alfacem Global Academy"></div>
+
+  <div class="faixa">
+    <span class="t">Pesquisa Anônima de Feedback</span>
+    <span class="s">Pais, Responsáveis e Alunos</span>
+  </div>
+
+  <div class="corpo">
+
+    <div class="abertura">
+      <p>Agradecemos a participação de sua família na International University Fair da
+        Alfacem Global Academy. Esta pesquisa é totalmente anônima e busca compreender a
+        experiência das famílias, avaliar o valor do evento e identificar oportunidades
+        de melhoria para as próximas edições.</p>
+      <p class="tempo">O preenchimento leva aproximadamente 2 minutos.</p>
+    </div>
+
+    <noscript>
+      <p class="aviso erro">Esta pesquisa precisa de JavaScript para carregar.
+        Abra o link em outro navegador.</p>
+    </noscript>
+
+    <div id="aviso" class="aviso"></div>
+
+    <p class="aviso info" id="carregando">Carregando a pesquisa…</p>
+
+    <div id="formulario" class="oculto">
+
+      <p class="anonima">As respostas são gravadas sem qualquer vínculo com quem
+        respondeu. Não há nome, e-mail ou qualquer outro dado que identifique você.</p>
+
+      <div class="progresso"><div class="trilha" id="trilha"></div></div>
+
+      <div class="estagio">
+        <span class="conta" id="passo-conta"></span>
+        <span class="nome" id="passo-nome"></span>
+      </div>
+
+      <div id="perguntas"></div>
+
+      <div class="navegacao">
+        <button type="button" class="voltar" id="voltar">← Voltar</button>
+        <button type="button" class="avancar" id="avancar">Continuar →</button>
+        <button type="button" class="enviar oculto" id="enviar">Enviar respostas</button>
+      </div>
+    </div>
+
+    <div id="pronto" class="pronto oculto">
+      <div class="marca-ok">✓</div>
+      <span class="titulo">Muito obrigado!</span>
+      <p class="detalhe" id="pronto-detalhe">Muito obrigado por fazer parte da
+        International University Fair da Alfacem Global Academy. Seu feedback
+        contribuirá diretamente para o planejamento e o aprimoramento das próximas
+        edições.</p>
+    </div>
+
+  </div>
+
+  <div class="assinatura">
+    <b>Alfacem Global Academy</b><br>International Counseling
+  </div>
+
+  <img class="rodape-arte" src="rodape-feira.jpg" alt="Alfacem Global Academy">
+
+</div>
+
+<script>
+const SUPABASE_URL      = window.CONFIG.SUPABASE_URL;
+const SUPABASE_ANON_KEY = window.CONFIG.SUPABASE_ANON_KEY;
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+});
+
+const $ = s => document.querySelector(s);
+
+/* O código do convite vem no endereço, nas duas formas aceitas:
+   .../avaliacao-familias#CODIGO  e  .../avaliacao-familias?t=CODIGO
+
+   O hash é a forma preferida — o que vem depois do # não é enviado
+   ao servidor nem entra em log de CDN. O ?t= é rede de segurança:
+   fragmento some em redirecionamento, em reescrita de link por
+   antivírus de e-mail e em cliente que "limpa" endereço. */
+const TOKEN = (() => {
+  /* Hash malformado (%zz colado por um cliente de e-mail) faz
+     decodeURIComponent lançar URIError. Nu, num caminho de
+     inicialização, isso mataria o script antes de qualquer
+     listener e a página ficaria branca e muda. */
+  const decodificar = t => { try { return decodeURIComponent(t); } catch (e) { return t; } };
+  const doHash = decodificar((location.hash || '').replace(/^#/, '').trim());
+  if (doHash) return doHash;
+  return (new URLSearchParams(location.search).get('t') || '').trim();
+})();
+
+const respostas = {};
+
+/* Marca de "já respondi", por código: se o código for trocado para
+   uma segunda rodada, a marca velha não bloqueia a nova. */
+const MARCA_LOCAL = 'pesquisa-familias:' + TOKEN.toUpperCase().replace(/[^0-9A-Z]/g, '');
+
+/* Ler localStorage também lança quando o armazenamento está
+   bloqueado — política de cookies, navegação privada em iOS antigo,
+   navegador corporativo. Só o gravar estava protegido; sem o par,
+   a pesquisa inteira morria na abertura. */
+const marcouAqui = () => { try { return !!localStorage.getItem(MARCA_LOCAL); } catch (e) { return false; } };
+const marcarAqui = () => { try { localStorage.setItem(MARCA_LOCAL, '1'); } catch (e) { /* modo privado */ } };
+
+/* O "carregando" some no primeiro desfecho, seja ele qual for.
+   Sem isso, uma chamada que nunca volta deixa a pessoa olhando
+   para uma tela que não diz nada. */
+function pronto() {
+  const c = $('#carregando');
+  if (c) c.remove();
+}
+
+function avisar(txt, tipo) {
+  pronto();
+  $('#aviso').textContent = txt || '';
+  $('#aviso').className = 'aviso' + (txt ? ' ' + (tipo || 'erro') : '');
+  if (txt) $('#aviso').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+const esc = t => String(t == null ? '' : t)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/* ============================================================
+   As seis questões do formulário em papel
+   (Alfacem_Global_Academy_Feedback_Pais.pdf)
+
+   Cada escala tem os rótulos que o papel traz, e eles mudam de
+   pergunta para pergunta: "Muito boa" na 1, "Muito boas" na 2,
+   "Contribuiu bastante" na 4. Uniformizar seria mais fácil de
+   programar e mudaria o sentido do que a família responde.
+   ============================================================ */
+const PASSOS = [
+  'Sua experiência',
+  'As universidades e o futuro',
+  'Seus comentários'
+];
+
+const PERGUNTAS = [
+  { passo: 0, num: '·', tipo: 'perfil', chave: 'perfil',
+    titulo: 'Quem está respondendo?',
+    opcoes: [
+      ['responsavel', 'Responsável'],
+      ['aluno',       'Aluno(a)'],
+      ['ambos',       'Respondemos juntos']
+    ] },
+
+  { passo: 0, num: '1', tipo: 'escala', chave: 'q1_geral',
+    titulo: 'De maneira geral, como você avaliaria sua experiência na Career Day · ' +
+            'Alfa University Fair da Alfacem Global Academy?',
+    ajuda: 'Obrigatória.',
+    rotulos: [
+      [1, 'Muito insatisfatória'],
+      [2, 'Insatisfatória'],
+      [3, 'Satisfatória'],
+      [4, 'Muito boa'],
+      [5, 'Excelente']
+    ] },
+
+  { passo: 0, num: '2', tipo: 'escala', chave: 'q2_organizacao',
+    titulo: 'Como você avaliaria a organização, a infraestrutura e a experiência de ' +
+            'circulação durante a feira?',
+    rotulos: [
+      [1, 'Muito insatisfatórias'],
+      [2, 'Insatisfatórias'],
+      [3, 'Satisfatórias'],
+      [4, 'Muito boas'],
+      [5, 'Excelentes']
+    ] },
+
+  { passo: 1, num: '3', tipo: 'escala', chave: 'q3_universidades',
+    titulo: 'Como você avalia a qualidade e a diversidade das universidades e ' +
+            'instituições participantes?',
+    ajuda: 'Considere instituições nacionais e internacionais, variedade de países, ' +
+           'cursos, perfis acadêmicos e oportunidades apresentadas.',
+    rotulos: [
+      [1, 'Muito insatisfatória'],
+      [2, 'Insatisfatória'],
+      [3, 'Satisfatória'],
+      [4, 'Muito boa'],
+      [5, 'Excelente']
+    ] },
+
+  { passo: 1, num: '4', tipo: 'escala', chave: 'q4_contribuicao',
+    titulo: 'Em que medida a feira ajudou sua família e seu(sua) filho(a) a conhecer ' +
+            'novas possibilidades universitárias e a tomar decisões mais informadas ' +
+            'sobre o futuro acadêmico?',
+    ajuda: 'Considere a descoberta de novas instituições, informações sobre cursos e ' +
+           'processos seletivos, oportunidades no Brasil e no exterior e o contato ' +
+           'direto com representantes.',
+    rotulos: [
+      [1, 'Não contribuiu'],
+      [2, 'Contribuiu pouco'],
+      [3, 'Contribuiu de forma satisfatória'],
+      [4, 'Contribuiu bastante'],
+      [5, 'Contribuiu de forma excepcional']
+    ] },
+
+  { passo: 1, num: '5', tipo: 'escala', chave: 'q5_valor',
+    titulo: 'Após participar da feira, como você avalia o valor de iniciativas como ' +
+            'esta para a formação e a orientação universitária dos alunos da Alfacem ' +
+            'Global Academy?',
+    rotulos: [
+      [1, 'Muito baixo'],
+      [2, 'Baixo'],
+      [3, 'Satisfatório'],
+      [4, 'Alto'],
+      [5, 'Extremamente alto']
+    ] },
+
+  { passo: 2, num: '6', tipo: 'texto',
+    titulo: 'Qual foi o principal ponto positivo da feira e qual seria a melhoria mais ' +
+            'importante que você recomendaria para a próxima edição?',
+    ajuda: 'Valorizamos comentários sinceros sobre instituições participantes, ' +
+           'organização, infraestrutura, fluxo, atendimento, informações oferecidas ' +
+           'ou qualquer outro aspecto da experiência.',
+    campos: [
+      ['q6_ponto_forte', '6.1', 'Principal ponto positivo'],
+      ['q6_melhoria',    '6.2', 'Melhoria mais importante']
+    ] }
+];
+
+/* ---- desenho ---- */
+
+function botoesEscala(chave, rotulos, classe) {
+  const linhas = rotulos.map(([valor, rotulo]) =>
+    '<button type="button" data-chave="' + chave + '" data-valor="' + esc(valor) + '" aria-pressed="false">' +
+      (classe === 'perfil' ? '' : '<span class="n">' + esc(valor) + '</span>') +
+      '<span class="l">' + esc(rotulo) + '</span>' +
+    '</button>').join('');
+
+  return '<div class="escala' + (classe ? ' ' + classe : '') + '">' + linhas + '</div>';
+}
+
+function desenhar() {
+  $('#perguntas').innerHTML = PERGUNTAS.map(p => {
+    let corpo = '';
+
+    if (p.tipo === 'escala') {
+      corpo = botoesEscala(p.chave, p.rotulos);
+
+    } else if (p.tipo === 'perfil') {
+      corpo = botoesEscala(p.chave, p.opcoes, 'perfil');
+
+    } else if (p.tipo === 'texto') {
+      corpo = p.campos.map(([chave, num, rotulo]) =>
+        '<div class="item">' +
+          '<div class="rot">' +
+            '<span class="subnum">' + esc(num) + '</span>' +
+            '<span class="rotulo">' + esc(rotulo) + '</span>' +
+          '</div>' +
+          '<textarea data-campo="' + chave + '"></textarea>' +
+        '</div>').join('');
+    }
+
+    /* Todas as perguntas são desenhadas de uma vez e escondidas por
+       etapa, em vez de redesenhadas a cada avanço. Assim o que já foi
+       marcado continua marcado ao voltar, sem precisar guardar e
+       repor estado de tela — o DOM é a memória. */
+    return '<div class="pergunta" data-passo="' + p.passo + '">' +
+      '<div class="cabeca">' +
+        '<span class="num">' + esc(p.num) + '</span>' +
+        '<span class="titulo">' + esc(p.titulo) + '</span>' +
+        (p.ajuda ? '<p class="ajuda">' + esc(p.ajuda) + '</p>' : '') +
+      '</div>' +
+      '<div class="miolo">' + corpo + '</div>' +
+    '</div>';
+  }).join('');
+
+  $('#trilha').innerHTML = PASSOS.map(() => '<span></span>').join('');
+
+  /* ---- cliques ---- */
+  $('#perguntas').addEventListener('click', ev => {
+    const b = ev.target.closest('button[data-chave]');
+    if (!b) return;
+
+    const chave = b.dataset.chave;
+    /* O perfil é texto ('aluno'); as notas são número. Guardar a
+       nota como texto faria o CHECK do banco recusar a linha. */
+    const valorDe = t => /^\d+$/.test(t) ? Number(t) : t;
+    const valor = valorDe(b.dataset.valor);
+
+    /* Clicar no que já está marcado desmarca — a única forma de
+       voltar atrás numa pergunta que não é obrigatória. */
+    respostas[chave] = (respostas[chave] === valor) ? undefined : valor;
+
+    b.parentElement.querySelectorAll('button[data-chave="' + chave + '"]').forEach(x =>
+      x.setAttribute('aria-pressed',
+        String(respostas[chave] !== undefined && valorDe(x.dataset.valor) === respostas[chave])));
+  });
+
+  $('#perguntas').addEventListener('input', ev => {
+    if (ev.target.dataset.campo) respostas[ev.target.dataset.campo] = ev.target.value;
+  });
+}
+
+/* ============================================================
+   Navegação por etapas
+   ============================================================ */
+let passo = 0;
+
+function mostrarPasso(novo) {
+  passo = Math.max(0, Math.min(PASSOS.length - 1, novo));
+
+  document.querySelectorAll('.pergunta').forEach(el => {
+    el.classList.toggle('oculto', Number(el.dataset.passo) !== passo);
+  });
+
+  const ultimo = passo === PASSOS.length - 1;
+  $('#voltar').disabled = passo === 0;
+  $('#avancar').classList.toggle('oculto', ultimo);
+  $('#enviar').classList.toggle('oculto', !ultimo);
+
+  $('#trilha').querySelectorAll('span').forEach((s, i) => {
+    s.className = i < passo ? 'feito' : (i === passo ? 'atual' : '');
+  });
+
+  $('#passo-conta').textContent = 'Etapa ' + (passo + 1) + ' de ' + PASSOS.length;
+  $('#passo-nome').textContent = PASSOS[passo];
+
+  /* Volta ao topo a cada troca. Sem isso, quem estava no fim de uma
+     tela longa cai no meio da próxima e acha que faltou conteúdo. */
+  /* A forma de dois argumentos funciona em tudo. O objeto com
+     behavior:'instant' só foi aceito a partir do Safari 15.4 e do
+     Chrome 97 — antes disso lança TypeError e derruba a troca de
+     etapa. */
+  window.scrollTo(0, 0);
+}
+
+$('#avancar').addEventListener('click', () => {
+  /* A pergunta 1 é a única obrigatória e mora na primeira etapa:
+     travar aqui evita preencher tudo para descobrir no fim que
+     faltou a primeira. */
+  if (passo === 0 && respostas.q1_geral === undefined) {
+    avisar('Responda a pergunta 1 para continuar.');
+    return;
+  }
+  avisar('');
+  mostrarPasso(passo + 1);
+});
+
+$('#voltar').addEventListener('click', () => { avisar(''); mostrarPasso(passo - 1); });
+
+/* ---- envio ---- */
+function agradecer(texto) {
+  pronto();
+  $('#formulario').classList.add('oculto');
+  $('#pronto').classList.remove('oculto');
+  if (texto) $('#pronto-detalhe').textContent = texto;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+$('#enviar').addEventListener('click', async () => {
+  if (respostas.q1_geral === undefined) {
+    avisar('Responda a pergunta 1 antes de enviar.');
+    mostrarPasso(0);
+    return;
+  }
+
+  const botao = $('#enviar');
+  botao.disabled = true;
+  botao.textContent = 'Enviando…';
+  avisar('');
+
+  try {
+    const { error } = await sb.rpc('registrar_avaliacao_familia', {
+      p_token: TOKEN, p_dados: respostas
+    });
+    if (error) throw error;
+
+    marcarAqui();
+    agradecer();
+
+  } catch (e) {
+    const msg = String(e && e.message || e);
+
+    /* Prazo encerrado entre abrir e enviar: mandar "tente de novo"
+       seria um laço sem fim, porque nunca mais vai passar. */
+    if (/pesquisa_encerrada/.test(msg)) {
+      avisar('O prazo desta pesquisa acabou de encerrar. Obrigado pelo interesse!', 'info');
+      botao.textContent = 'Pesquisa encerrada';
+      return;
+    }
+
+    if (/resposta_vazia/.test(msg)) {
+      avisar('Responda a pergunta 1 antes de enviar.');
+      mostrarPasso(0);
+      botao.disabled = false;
+      botao.textContent = 'Enviar respostas';
+      return;
+    }
+
+    avisar(/convite_invalido/.test(msg)
+      ? 'Este link não é mais válido. Fale com a escola.'
+      : 'Não consegui enviar. Tente de novo em instantes.');
+
+    botao.disabled = false;
+    botao.textContent = 'Enviar respostas';
+  }
+});
+
+/* ---- abertura ---- */
+(async () => {
+  if (!TOKEN) {
+    avisar('Link incompleto: falta a parte final do endereço, depois do #. ' +
+           'Copie o link inteiro da mensagem que você recebeu e cole na barra de endereço.');
+    return;
+  }
+
+  try {
+    const { data, error } = await sb.rpc('avaliacao_familia_convite', { p_token: TOKEN });
+    if (error) throw error;
+
+    /* O código é o mesmo para todas as famílias, então o servidor
+       não tem como saber que este navegador já respondeu. A marca
+       local cobre o caso comum: recarregar a página, tocar duas
+       vezes, voltar pelo histórico. Contra quem quiser responder de
+       novo de propósito não há defesa, e nem deveria haver: é uma
+       pesquisa de satisfação, não uma eleição. */
+    if (marcouAqui()) {
+      agradecer('Você já respondeu esta pesquisa neste dispositivo. Obrigado!');
+      return;
+    }
+
+    pronto();
+    desenhar();
+    mostrarPasso(0);
+    $('#formulario').classList.remove('oculto');
+
+  } catch (e) {
+    const msg = String(e && e.message || e);
+    avisar(
+      /pesquisa_encerrada/.test(msg)
+        ? 'O prazo desta pesquisa foi encerrado. Obrigado pelo interesse!'
+      : /convite_invalido/.test(msg)
+        ? 'Link não encontrado. Confira o endereço da mensagem que você recebeu.'
+        : 'Não consegui abrir a pesquisa agora. Tente de novo em instantes.',
+      /pesquisa_encerrada/.test(msg) ? 'info' : 'erro');
+  }
+})();
+</script>
+</body>
+</html>
